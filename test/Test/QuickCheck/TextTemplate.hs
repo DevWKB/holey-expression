@@ -39,7 +39,7 @@ genHoleFilling = sized $ \n ->
 genTemplateNat :: Natural -> Gen (Template Text)
 genTemplateNat 0 = genChunk
 genTemplateNat n = do (Template t holeProps) <- genTemplateNat $ n - 1
-                      h <- arbitrary :: Gen Int
+                      h <- arbitrary :: Gen Natural
                       f <- genHoleFilling
                       c <- arbitrary :: Gen Text
                       let t' = ICompose c h t                      

@@ -19,6 +19,7 @@ import Language.Haskell.TH        qualified as TH
 import Data.Text                  qualified as DT
 
 import Data.TextTemplate.TemplateInternal
+import GHC.Natural (Natural)
 
 -- * Quasi-Quoter for Templates 
 
@@ -112,7 +113,7 @@ mkTextLit = TH.litE . TH.StringL . DT.unpack
 
 -- | Convert a `Natural` to a Template Haskell literal.
 mkNaturalLit :: TH.Quote m 
-            => Int -- ^ Natural to convert
+            => Natural -- ^ Natural to convert
             -> m Exp
 mkNaturalLit n | n >= 0 = TH.litE . TH.IntegerL . toInteger $ n
                | otherwise = error "QQ error: hole indices must be natural numbers"
