@@ -6,8 +6,10 @@ Copyright   : (c) Harley Eades, 2026
 Maintainer  : harley.eades@pm.me
 
 -}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# OPTIONS_GHC -Wno-orphans   #-}
 module  Data.TextTemplate.JSONInternalSpec (spec) where
 
 import Test.Hspec
@@ -28,7 +30,9 @@ import Data.TextTemplate.TemplateInternal (Template
                                           ,(+>)
                                           ,chunk
                                           ,hole
-                                          ,filled)
+                                          ,filled, HoleFillingExp (..), TParseError,varParser)
+import Text.Megaparsec (Parsec, many, (<|>))
+import Text.Megaparsec.Char (digitChar)
 
 spec :: Spec
 spec = do    
@@ -486,7 +490,30 @@ test_object19 = UnitTest {
     }
 
 -- * Template Functions
-test_templateFun1 :: Int -> UnitTest (Template Int)
+instance HoleFillingExp Int where
+  varHFExp :: Int -> Maybe String
+  varHFExp = Just . show
+
+  hfExpToText :: Int -> Text
+  hfExpToText = DT.show
+  
+  parseHFExp :: Parsec TParseError Text Int
+  parseHFExp = read <$> many digitChar
+
+instance HoleFillingExp a => HoleFillingExp (Either String a) where
+  varHFExp :: Either String a -> Maybe String
+  varHFExp = either Just (const Nothing) 
+
+  hfExpToText :: Either String a -> Text
+  hfExpToText = either DT.pack (hfExpToText a)
+  
+  parseHFExp :: Parsec TParseError Text (Either String a)
+  parseHFExp = try parseValue <|> varParser
+    where
+        parseValue :: Parsec TParseError Text a
+        parseValue = parseHFExp
+
+test_templateFun1 :: Int -> UnitTest (Template (Either String Int))
 test_templateFun1 v = UnitTest {
         test_output = [jsonTemplate|{"field1": '$1{v}'}|]
        ,test_result = chunk "{\"field1\":" +> filled 1 v +> chunk "}"

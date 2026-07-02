@@ -11,6 +11,9 @@ Various properties of the internals of the text templates API.
 module  Data.TextTemplate.TemplateInternalSpec (spec) where
 
 import Test.Hspec            
+import Test.QuickCheck.TextTemplate
+import Test.Helpers                       (parseTest)
+import Data.TextTemplate.TemplateInternal
 import Test.QuickCheck                     (Property
                                            ,Testable (property)
                                            ,verboseCheck
@@ -19,9 +22,9 @@ import Test.Hspec.QuickCheck               (prop)
 import Data.Text                           (Text)
 
 import Test.Helpers                        (UnitTest(..)
-                                           ,test_case)
-import Data.TextTemplate.TemplateInternal
-import Test.QuickCheck.TextTemplate
+                                           ,test_case, testParser)
+import Data.Maybe                          (isJust)
+import Text.Megaparsec                     (parse)
 
 spec :: Spec 
 spec = do
@@ -31,6 +34,16 @@ spec = do
                 prop_associativeCompose
             prop "identity" $
                 prop_identityCompose
+    describe "Unit Tests:" $ do
+        describe "Parsing:" $ do
+            describe "Holes:" $ do
+                test_case "no index"                 test_parseFail1
+                test_case "negative index"           test_parseFail2
+                test_case "no opening brace"         test_parseFail3
+                test_case "no closing brace"         test_parseFail4
+                test_case "non-escaped curly brace"  test_parseFail5
+                test_case "non-escaped backslash"    test_parseFail6
+                test_case "filling in unit template" test_parseFail7
 
 prop_associativeCompose 
     :: Template Text 
@@ -46,3 +59,50 @@ prop_identityCompose
 prop_identityCompose t = property $ 
     (empty +> t) == t && (t +> empty) == t
 
+testParseTextTemplate :: Parser (Template Text)
+testParseTextTemplate = templateParser
+
+testParseUnitTemplate :: Parser (Template ())
+testParseUnitTemplate = templateParser
+
+test_parseFail1 :: UnitTest (Maybe (Template Text))
+test_parseFail1 = UnitTest {
+         test_result=parseTest testParseTextTemplate "foo${a}"
+        ,test_output=Nothing
+    }
+
+test_parseFail2 :: UnitTest (Maybe (Template Text))
+test_parseFail2 = UnitTest {
+         test_result=parseTest testParseTextTemplate "foo$-1{a}"
+        ,test_output=Nothing
+    }
+
+test_parseFail3 :: UnitTest (Maybe (Template Text))
+test_parseFail3 = UnitTest {
+         test_result=parseTest testParseTextTemplate "foo$1a}bar"
+        ,test_output=Nothing
+    }
+
+test_parseFail4 :: UnitTest (Maybe (Template Text))
+test_parseFail4 = UnitTest {
+         test_result=parseTest testParseTextTemplate "foo$1{abar"
+        ,test_output=Nothing
+    }
+
+test_parseFail5 :: UnitTest (Maybe (Template Text))
+test_parseFail5 = UnitTest {
+         test_result=parseTest testParseTextTemplate "foo$1{{a}bar"
+        ,test_output=Nothing
+    }
+
+test_parseFail6 :: UnitTest (Maybe (Template Text))
+test_parseFail6 = UnitTest {
+         test_result=parseTest testParseTextTemplate "foo$1{\\a}bar"
+        ,test_output=Nothing
+    }
+
+test_parseFail7 :: UnitTest (Maybe (Template ()))
+test_parseFail7 = UnitTest {
+         test_result=parseTest testParseUnitTemplate "foo$1{}bar"
+        ,test_output=Nothing
+    }

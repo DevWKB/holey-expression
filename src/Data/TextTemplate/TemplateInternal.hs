@@ -8,8 +8,11 @@ Maintainer  : harley.eades@pm.me
 Framework for creating text templates. These are text with holes that 
 can be filled and plugged. No parsing of the actual text is done, but the 
 text is broken up into `chunk`'s in between the `hole`'s.
+
+Notes for writing docs:
+    - Hole filling parser must escape curly braces and forward slash.
 -}
-{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE PatternSynonyms              #-}
 {-# LANGUAGE DataKinds                    #-}
 {-# LANGUAGE TypeOperators                #-}
 {-# LANGUAGE AllowAmbiguousTypes          #-}
@@ -18,40 +21,52 @@ text is broken up into `chunk`'s in between the `hole`'s.
 {-# LANGUAGE RankNTypes                   #-}
 {-# LANGUAGE TypeApplications             #-}
 {-# LANGUAGE BangPatterns                 #-}
-{-# LANGUAGE TypeAbstractions             #-}
 {-# LANGUAGE TupleSections                #-}
+{-# LANGUAGE PatternSynonyms              #-}
+{-# LANGUAGE MultiParamTypeClasses        #-}
+{-# LANGUAGE FlexibleInstances            #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
-{-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleInstances #-}
 module Data.TextTemplate.TemplateInternal where
 
-import Data.Text (Text)
-import Data.Text qualified as DT
-import Text.Megaparsec                      (Parsec
-                                            ,between
-                                            ,skipCount
-                                            ,many
-                                            ,some
-                                            ,satisfy
-                                            ,choice
-                                            ,atEnd
-                                            ,parseTest
-                                            ,parse
-                                            ,errorBundlePretty
-                                            ,MonadParsec (try, takeWhile1P)
-                                            ,(<|>), ShowErrorComponent (..), lookAhead, customFailure)                                    
-import Data.Char                            qualified as DT
-import Text.Megaparsec.Char                 (char
-                                            ,digitChar, space, string)
+import Prelude                    hiding (null)
+import Data.Text                  (Text)
+import Data.Text                  qualified as DT
+import Data.Char                  (isAsciiLower
+                                  ,isAlphaNum
+                                  ,isAscii)
+import Data.Maybe                 (isNothing)
+import Data.String                (IsString (..))
+import Data.List                  qualified as L
+import Data.NatMap                (NatMap
+                                  ,Natural
+                                  ,(!?)
+                                  ,keys
+                                  ,insert
+                                  ,(!)
+                                  ,delete
+                                  ,singleton)
+import Data.NatMap                qualified as M
+import Text.Megaparsec            (Parsec
+                                  ,ShowErrorComponent (..)
+                                  ,MonadParsec (try, takeWhile1P)
+                                  ,between
+                                  ,skipCount
+                                  ,many
+                                  ,some
+                                  ,satisfy
+                                  ,choice
+                                  ,atEnd
+                                  ,parseTest
+                                  ,parse
+                                  ,errorBundlePretty                                  
+                                  ,(<|>)                                  
+                                  ,lookAhead
+                                  ,customFailure)                                    
+import Text.Megaparsec.Char       (char
+                                  ,digitChar
+                                  ,space
+                                  ,string)
 import Text.Megaparsec.Char.Lexer (symbol)
-import Data.Char (isAsciiLower, isAlphaNum, isAscii)
-import Data.Maybe (isNothing)
-import Prelude                 hiding (null)
-import Data.String (IsString (..))
-import qualified Data.List as L
-import Data.NatMap (NatMap, Natural, (!?), keys, insert, (!), delete, singleton)
-import Data.NatMap qualified as M
 
 type Hole f      = (Natural,HoleProps f)
 type HoleProps f = ([Natural],NatMap f)
@@ -118,12 +133,12 @@ data Template f where
              -> HoleProps f       -- ^ Empty holes and hole-filling map
              -> Template f
 
-instance Show f => Show (Template f) where
+instance HoleFillingExp f => Show (Template f) where
     show :: Template f -> String    
     show (Template (IChunk t) _) = DT.unpack t    
     show (Template (ICompose prefix i rest) (emptyHoles, filledHoles))
         = DT.unpack prefix <> "$" <> show i <> "{"
-                           <> (if i `elem` emptyHoles then "" else (show $ filledHoles ! i))
+                           <> (if i `elem` emptyHoles then "" else (DT.unpack . hfExpToText $ filledHoles ! i))
                            <> "}" <> show (Template rest (emptyHoles, filledHoles))
 
 -- * Combinators
@@ -417,6 +432,29 @@ instance HoleFillingExp () where
     parseHFExp :: Parsec TParseError Text ()
     parseHFExp = pure ()
 
+instance HoleFillingExp Text where
+    varHFExp :: Text -> Maybe String
+    varHFExp _ = Nothing
+
+    hfExpToText :: Text -> Text
+    hfExpToText = id
+
+    parseHFExp :: Parsec TParseError Text Text
+    parseHFExp = DT.pack <$> textFillingParser
+        where
+            textFillingParser = many charTextFillingParser
+
+            charTextFillingParser :: Parsec TParseError Tok Char
+            charTextFillingParser = choice [
+                    satisfy (\c -> c /= '{' && c /= '}' && c /= '\\'),
+                    escapeCharTextFillingParser
+                ]
+
+            escapeCharTextFillingParser :: Parsec TParseError Tok Char
+            escapeCharTextFillingParser = do
+                skip (string "\\")
+                satisfy (`elem` ['{','}','\\'])
+
 -- | A intermediate expression language for text templates where expressions
 -- (`FillingExp`) fill their holes.
 type TemplateExp = Template FillingExp
@@ -487,8 +525,7 @@ parseFillingExp s
         Left bundle -> Left . DT.pack $ errorBundlePretty bundle
         Right t -> Right t
 
-
-charFillingParser :: Parsec TParseError Tok DT.Char
+charFillingParser :: Parsec TParseError Tok Char
 charFillingParser = choice [
         satisfy (\c -> c /= '"' && c /= '\\'),
         escapeCharFillingParser
@@ -502,13 +539,16 @@ escapeCharFillingParser = do
 stringFillingParser :: Parsec TParseError Tok Text
 stringFillingParser = DT.pack <$> many charFillingParser
 
-varFillingParser :: Parsec TParseError Tok FillingExp
-varFillingParser = VarFilling <$> do
+varParser :: Parsec TParseError Tok String
+varParser = do
     -- Make sure we start with a lower-case ascii letter.
     c <- maybeParser . lookAhead $ takeWhile1P Nothing isAsciiLower
     if isNothing c
-    then customFailure $ HFExpParseError "filling variables must being with a lower-case letter"
+    then customFailure $ HFExpParseError "variables must being with a lower-case letter"
     else DT.unpack <$> takeWhile1P Nothing (\c -> isAlphaNum c && isAscii c)
+
+varFillingParser :: Parsec TParseError Tok FillingExp
+varFillingParser = VarFilling <$> varParser
 
 litFillingParser :: Parsec TParseError Tok FillingExp
 litFillingParser = LitFilling <$> doubleQuotedParser stringFillingParser
@@ -610,7 +650,7 @@ templateParser = do
 -- | Parse a template character. These are any unicode character where the
 -- characters @['$','{','}','\\']@ are escaped when parsing a hole's filling,
 -- otherwise just @'$'@ needs to be escaped.
-templateCharParser :: Bool -> Parser DT.Char
+templateCharParser :: Bool -> Parser Char
 templateCharParser filling = choice [
         satisfy (\c -> c /= '$' && c /= '\'' && (if filling then c /= '{' && c /= '}' else True) && c /= '\\'),
         escapedTemplateCharParser

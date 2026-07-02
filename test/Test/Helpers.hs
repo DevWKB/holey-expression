@@ -10,11 +10,12 @@ module Test.Helpers
     (UnitTest(..)
     ,test_case
     ,testParser                
-    ,testParseFile) where
+    ,testParseFile
+    ,parseTest) where
 
 import Test.Hspec
 import Text.Megaparsec   (ParsecT
-                         ,ParseErrorBundle)
+                         ,ParseErrorBundle, parse, Parsec)
 import Data.Maybe        (isJust)
 import Data.Either.Extra (eitherToMaybe)
 
@@ -24,6 +25,9 @@ data UnitTest a = UnitTest {
      test_output :: a -- ^ Output of a computation
     ,test_result :: a -- ^ Expected result of the test
 }
+
+parseTest :: Parsec e t a -> t -> Maybe a
+parseTest p = eitherToMaybe . flip parse "" p
 
 testParser :: (ParsecT e t m a -> t -> Either (ParseErrorBundle t e) a)
            -> ParsecT e t m a 
