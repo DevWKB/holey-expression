@@ -2,8 +2,8 @@
 Module      : Template
 Description : Framework for creating text templates
 Copyright   : (c) Harley Eades, 2026
-              (c) WKB3, 2026
-Maintainer  : harley.eades@wkb3.com
+              (c) WꓘB, 2026
+Maintainer  : harley.eades@pm.me
 
 Framework for creating text templates. These are text with holes that can
 be filled and plugged. No parsing of the actual text is done, but the text

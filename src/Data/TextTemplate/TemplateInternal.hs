@@ -2,8 +2,8 @@
 Module      : Template
 Description : Framework for creating text templates
 Copyright   : (c) Harley Eades, 2026
-              (c) WKB3, 2026
-Maintainer  : harley.eades@wkb3.com
+              (c) WꓘB, 2026
+Maintainer  : harley.eades@pm.me
 
 Framework for creating text templates. These are text with holes that 
 can be filled and plugged. No parsing of the actual text is done, but the 
@@ -49,36 +49,9 @@ import Data.Char (isAsciiLower, isAlphaNum, isAscii)
 import Data.Maybe (isNothing)
 import Prelude                 hiding (null)
 import Data.String (IsString (..))
-import qualified Data.IntMap as M
-import Data.IntMap (IntMap)
-import GHC.Natural (Natural)
 import qualified Data.List as L
-
-type NatMap f    = IntMap f
-
-naturalToInt :: Natural -> Int
-naturalToInt = fromInteger . toInteger
-
-intToNatural :: Int -> Natural
-intToNatural = fromInteger . toInteger
-
-insert :: Natural -> f -> NatMap f -> NatMap f
-insert (naturalToInt->k) = M.insert k
-
-(!?) :: NatMap f -> Natural -> Maybe f
-m !? (naturalToInt->k) =  m M.!? k
-
-(!) :: NatMap f -> Natural -> f
-m ! (naturalToInt->k) = m M.! k
-
-singleton :: Natural -> f -> NatMap f
-singleton (naturalToInt->k)= M.singleton k
-
-delete :: Natural -> NatMap f -> NatMap f
-delete (naturalToInt->k) = M.delete k
-
-keys :: NatMap f -> [Natural]
-keys = M.foldrWithKey (\k _ r -> intToNatural k : r) []
+import Data.NatMap (NatMap, Natural, (!?), keys, insert, (!), delete, singleton)
+import Data.NatMap qualified as M
 
 type Hole f      = (Natural,HoleProps f)
 type HoleProps f = ([Natural],NatMap f)

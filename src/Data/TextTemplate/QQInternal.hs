@@ -2,8 +2,8 @@
 Module      : QQInternal
 Description : Quasi-Quoter for Templates
 Copyright   : (c) Harley Eades, 2026
-              (c) WKB3, 2026
-Maintainer  : harley.eades@wkb3.com
+              (c) WꓘB, 2026
+Maintainer  : harley.eades@pm.me
 
 Includes parsers for templates as well as a quasi-quoter 
 for generating templates at compile time.

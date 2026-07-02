@@ -2,8 +2,8 @@
 Module      : JSONSpec
 Description : Tests for JSON Templates
 Copyright   : (c) Harley Eades, 2026
-              (c) WKB3, 2026
-Maintainer  : harley.eades@gmail.com
+              (c) WꓘB, 2026
+Maintainer  : harley.eades@pm.me
 
 -}
 {-# LANGUAGE TemplateHaskell #-}

@@ -27,6 +27,7 @@ library
       Data.TextTemplate.Text
       Data.TextTemplate.JSON
       Data.TextTemplate.JSONInternal
+      Data.NatMap
   other-modules:
       Paths_text_templates      
   autogen-modules:

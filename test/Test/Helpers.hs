@@ -2,8 +2,8 @@
 Module      : Helpers
 Description : Useful helpers for unit testing
 Copyright   : (c) Harley Eades, 2026
-              (c) WKB, 2026
-Maintainer  : harley.eades@gmail.com
+              (c) WꓘB, 2026
+Maintainer  : harley.eades@pm.me
 
 -}
 module Test.Helpers 
