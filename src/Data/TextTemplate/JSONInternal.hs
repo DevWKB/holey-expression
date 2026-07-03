@@ -33,13 +33,13 @@ import Text.Megaparsec            (Parsec
                                   ,errorBundlePretty
                                   ,sepBy1
                                   ,sepBy
-                                  ,MonadParsec (try, eof, lookAhead), customFailure, ShowErrorComponent, unexpected, (<?>), ParsecT, runParserT, count, takeWhileP)
+                                  ,MonadParsec (try, eof, lookAhead, takeWhile1P), customFailure, ShowErrorComponent, unexpected, (<?>), ParsecT, runParserT, count, takeWhileP)
 import Data.Text                  (Text)
 import Data.Text                  qualified as DT
 import Data.Void                  (Void)
 import Text.Megaparsec.Char       (string
                                   ,space, space1)
-import Data.Char                  (isPrint, isHexDigit, chr, generalCategory, isDigit)
+import Data.Char                  (isPrint, isHexDigit, chr, generalCategory, isDigit, isAsciiLower, isAscii, isAlphaNum)
 import Text.Megaparsec.Char.Lexer (float
                                   ,decimal
                                   ,symbol, signed)
@@ -55,8 +55,49 @@ import Data.TextTemplate.QQInternal       qualified as StrT
 import Numeric (readHex)
 import Text.Megaparsec.Error (ShowErrorComponent(..), ErrorItem (..))
 import Data.List.NonEmpty (fromList)
-import Control.Monad.State (State, evalState, MonadTrans (..), MonadState (..))
-import Data.TextTemplate.TemplateInternal (TemplateExp, FillingExp, HoleFillingExp, ToTemplate (..))
+import Control.Monad.State (State, evalState, MonadTrans (..), MonadState (..), evalStateT)
+import Data.TextTemplate.TemplateInternal (HoleFillingExp, ToTemplate (..), TParseError)
+import Data.Maybe (isNothing)
+
+-- * Templates + Filling Expressions
+
+-- | A intermediate expression language for text templates where expressions
+-- (`FillingExp`) fill their holes.
+type TemplateExp = Template FillingExp
+
+instance ToTemplate FillingExp TemplateExp where
+    toTemplate :: TemplateExp -> Template FillingExp
+    toTemplate = id
+
+-- | Hole fillings consist of meta-variables or literals which is anything that
+-- can be converted into a `Data.Text.Text`.
+data FillingExp 
+    = VarFilling String  -- ^ Meta-variable
+    | LitFilling Text    -- ^ Literal filling
+
+instance HoleFillingExp FillingExp where
+    varHFExp :: FillingExp -> Maybe String
+    varHFExp (VarFilling v) = Just v
+    varHFExp _              = Nothing
+    
+    hfExpToText :: FillingExp -> Text
+    hfExpToText (VarFilling v) = DT.pack v
+    hfExpToText (LitFilling t) = t
+    
+    parseHFExp :: Maybe (Text -> Either Text FillingExp)
+    parseHFExp = Just $ StrT.runParsecT (flip evalState []) fillingExpParser
+
+instance Show FillingExp where
+    show :: FillingExp -> String
+    show (VarFilling x) = x
+    show (LitFilling x) = show x
+
+instance Eq FillingExp where
+    -- | Equality is alpha-equivalence.
+    (==) :: FillingExp -> FillingExp -> Bool
+    (VarFilling _)  == (VarFilling _)  = True
+    (LitFilling l1) == (LitFilling l2) = l1 == l2
+    _               == _               = False
 
 -- * JSON Syntax
 
@@ -111,7 +152,7 @@ fieldLabel = chunk . (<> ":") . StrT.doubleQuote
 -- | Create a template of an array value.
 array :: [Either TemplateExp Value] -- ^ List of values of the array
       -> TemplateExp
-array = StrT.bracketTemplate . StrT.sepTemplatesBy (chunk ",")
+array = StrT.bracketTemplate . StrT.sepTemplatesBy @FillingExp (chunk ",")
 
 -- * Quasi-quoter for JSON templates
 
@@ -142,6 +183,7 @@ data JTParseError
     | JTPEInvalidEscapeChar
     | JTPEDuplicateField DT.Text
     | JTPELeadingZeros
+    | JTPEInvalidVarName
     deriving (Eq,Ord,Show)
 
 instance ShowErrorComponent JTParseError where
@@ -150,6 +192,7 @@ instance ShowErrorComponent JTParseError where
     showErrorComponent JTPEInvalidEscapeChar  = "invalid escape character"
     showErrorComponent (JTPEDuplicateField s) = "duplicate field: "<>(DT.unpack s)
     showErrorComponent JTPELeadingZeros       = "invalid number: leading zeros are not allowed"
+    showErrorComponent JTPEInvalidVarName     = "variables must begin with a lower-case letter and only consist of ASCII alpha-numeric characters"
 
 -- | Type of tokens.
 type Tok    = DT.Text
@@ -157,7 +200,7 @@ type Tok    = DT.Text
 type ParseError = ParseErrorBundle Tok JTParseError
 -- | Type of the parsers that operate on a stream of `Tok`. The state holds onto
 -- which fields have been parsed when parsing an object.
-type JSONParser a = ParsecT JTParseError Tok (State [DT.Text]) a
+type JSONParser a = ParsecT JTParseError Text (State [DT.Text]) a
 
 -- | Parse a string using the input parser.
 parse :: JSONParser a -> DT.Text -> Either ParseError a
@@ -175,6 +218,64 @@ parseTestFile :: Show a => JSONParser a -> FilePath -> IO ()
 parseTestFile p file = do
     f <- readFile file
     parseTest p (DT.pack f)
+
+-- | A hole filling meta-variable.
+varFexp :: String -> FillingExp
+varFexp = VarFilling
+
+showASTFilling :: FillingExp -> Text
+showASTFilling (LitFilling s) = "LitFilling "<>DT.show s
+showASTFilling (VarFilling v) = "VarFilling "<>DT.show v
+
+parseVarFilling :: Text -> Either Text String
+parseVarFilling s 
+    = case parse varFillingParser s of
+        Left bundle -> Left . DT.pack $ errorBundlePretty bundle
+        Right (VarFilling t) -> Right t
+        _ -> error "TextTemplates.Parser: impossible branch reached in parseVarFilling."
+
+parseLitFilling :: Text -> Either Text Text
+parseLitFilling s 
+    = case parse litFillingParser s of
+        Left bundle -> Left . DT.pack $ errorBundlePretty bundle
+        Right (LitFilling t) -> Right t
+        _ -> error "TextTemplates.Parser: impossible branch reached in parseLitFilling."
+
+parseFillingExp :: Text -> Either Text FillingExp
+parseFillingExp s 
+    = case parse fillingExpParser s of
+        Left bundle -> Left . DT.pack $ errorBundlePretty bundle
+        Right t -> Right t
+
+charFillingParser :: JSONParser Char
+charFillingParser = choice [
+        satisfy (\c -> c /= '"' && c /= '\\'),
+        escapeCharFillingParser
+    ]
+
+escapeCharFillingParser :: JSONParser Char
+escapeCharFillingParser = do
+    skip (string "\\")
+    satisfy (`elem` ['"','\\'])
+
+stringFillingParser :: JSONParser Text
+stringFillingParser = DT.pack <$> many charFillingParser
+
+
+varFillingParser :: JSONParser FillingExp
+varFillingParser = VarFilling <$> do
+    -- Make sure we start with a lower-case ascii letter.
+    c <- StrT.maybeParser . lookAhead $ takeWhile1P Nothing isAsciiLower
+    if isNothing c
+    then customFailure JTPEInvalidVarName
+    else DT.unpack <$> takeWhile1P Nothing (\c -> isAlphaNum c && isAscii c)
+
+litFillingParser :: JSONParser FillingExp
+litFillingParser = LitFilling <$> doubleQuotedParser stringFillingParser
+
+fillingExpParser :: JSONParser FillingExp
+fillingExpParser =  litFillingParser
+                <|> varFillingParser
 
 -- | The JSON parser.
 parseJSONTemplate 

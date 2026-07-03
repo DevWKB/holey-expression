@@ -47,7 +47,9 @@ module Data.TextTemplate (-- * Templates
                            -- ** Converting from Templates
                            ,chunkToText
                            -- * Quasi-Quoter for Templates
-                           ,template
+                           ,textTemplate
+                           ,unitTemplate
+                           ,intTemplate
                            ,textTemplate2QExp
                            ,template2QExp
                            -- * Text Combinators

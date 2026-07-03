@@ -56,17 +56,17 @@ import Text.Megaparsec            (Parsec
                                   ,satisfy
                                   ,choice
                                   ,atEnd
-                                  ,parseTest
                                   ,parse
-                                  ,errorBundlePretty                                  
-                                  ,(<|>)                                  
+                                  ,errorBundlePretty
+                                  ,(<|>)
                                   ,lookAhead
-                                  ,customFailure)                                    
+                                  ,customFailure, ParsecT, ParseErrorBundle, runParserT)                                    
 import Text.Megaparsec.Char       (char
                                   ,digitChar
                                   ,space
                                   ,string)
 import Text.Megaparsec.Char.Lexer (symbol)
+import Data.Void (Void)
 
 type Hole f      = (Natural,HoleProps f)
 type HoleProps f = ([Natural],NatMap f)
@@ -338,42 +338,34 @@ fillHole (Template t hlsProps) i c =
         FilledHole _ _ (hls,fhls) -> Just $ Template t (hls,insert i c fhls)
         UndefHole  _   _          -> Nothing
 
-class HoleFiller a where
-    toFilling :: a -> Text
-
-instance HoleFiller Text where
-    toFilling :: Text -> Text
-    toFilling = id
-
 -- | Plug an unfilled hole in a template with some text. Returns @Nothing@ when
 -- the hole index doesn't exist in the template or is filled, otherwise returns
 -- a template with the hole plugged. Plugging a hole replaces the hole with the
 -- value unlike `fillHole`.
-plugHoleI :: HoleFiller f 
-          => ITemplate
-          -> [Natural]               -- ^ List of unfilled holes
-          -> Natural                 -- ^ Hole index to plug
+plugHoleI :: (f -> Text)
+          -> ITemplate
+          -> [Natural]           -- ^ List of unfilled holes
+          -> Natural             -- ^ Hole index to plug
           -> f                   -- ^ Text to replace hole
           -> Maybe ITemplate
-plugHoleI (ICompose p h (IChunk s)) hls i c 
-    | i == h && h `elem` hls = Just $ IChunk $ p <> toFilling c <> s
-plugHoleI (ICompose p h r@(ICompose p' h' s)) hls i c 
-    | i == h && h `elem` hls = Just $ ICompose (p <> toFilling c <> p') h' s
-    | otherwise = do r' <- plugHoleI r hls i c
+plugHoleI toText (ICompose p h (IChunk s)) hls i c 
+    | i == h && h `elem` hls = Just $ IChunk $ p <> toText c <> s
+plugHoleI toText (ICompose p h r@(ICompose p' h' s)) hls i c 
+    | i == h && h `elem` hls = Just $ ICompose (p <> toText c <> p') h' s
+    | otherwise = do r' <- plugHoleI toText r hls i c
                      Just $ ICompose p h r'
-plugHoleI _ _ _ _ = Nothing       
+plugHoleI _ _ _ _ _ = Nothing       
 
 -- | Plug an unfilled hole in a template with some text. Returns @Nothing@ when
 -- the hole index doesn't exist in the template or is filled, otherwise returns
 -- a template with the hole plugged. Plugging a hole replaces the hole with the
 -- value unlike `fillHole`.
-plugHole :: HoleFiller f
-         => Template f
-         -> Natural  -- ^ Hole index to plug
-         -> f        -- ^ Text to replace hole
-         -> Maybe (Template f)
+plugHole :: HoleFillingExp hfExp => Template hfExp
+         -> Natural -- ^ Hole index to plug
+         -> hfExp   -- ^ Text to replace hole
+         -> Maybe (Template hfExp)
 plugHole (Template t@(ICompose _ _ _) (hls,fhls)) i c | i `elem` hls = 
-        do t' <- plugHoleI t hls i c
+        do t' <- plugHoleI hfExpToText t hls i c
            pure $ Template t' (i `L.delete` hls,fhls)
 plugHole _ _ _ = Nothing
 
@@ -381,41 +373,51 @@ plugHole _ _ _ = Nothing
 -- function. If the plug function is defined for every hole in the input
 -- template, then this function guarantees a template with no holes (a text).
 plugAllI 
-    :: HoleFiller f 
-    => [Natural]
-    -> (Natural -> Maybe f)      -- ^ Plug function.
+    :: (f -> Text)
+    -> [Natural]
+    -> (Natural -> Maybe f)  -- ^ Plug function.
     -> ITemplate             -- ^ ITemplate to plug.
     -> Maybe ITemplate
-plugAllI hls f (ICompose chk i r) | i `elem` hls = do
+plugAllI toText hls f (ICompose chk i r) | i `elem` hls = do
     chk' <- f i
-    IChunk chk'' <- plugAllI hls f r
-    return . IChunk $ chk <> toFilling chk' <> chk''
-plugAllI _ _ (ICompose _ _ _) = Nothing
-plugAllI _ _ t@(IChunk _) = return t
-
+    IChunk chk'' <- plugAllI toText hls f r
+    return . IChunk $ chk <> toText chk' <> chk''
+plugAllI _ _ _ (ICompose _ _ _) = Nothing
+plugAllI _ _ _ t@(IChunk _) = return t
 
 -- | Plugs every hole in a template with no filled holes using the given plug
 -- function. If the plug function is defined for every hole in the input
 -- template, then this function guarantees a template with no holes (a text) is
 -- returned.
-plugAll :: HoleFiller f
-        => Template f                          -- ^ Template to plug
-        -> ([Natural] -> (Natural -> Maybe f)) -- ^ Plug function
+plugAll :: HoleFillingExp hfExp 
+        => Template hfExp  -- ^ Template to plug
+        -> ([Natural] -> (Natural -> Maybe hfExp)) -- ^ Plug function
         -> Maybe Text
 plugAll (Template t (hls,fhls)) f | M.null fhls = 
-    case plugAllI hls (f hls) t of        
+    case plugAllI hfExpToText hls (f hls) t of        
         Just (IChunk c) -> Just c
         _              -> Nothing
 plugAll _ _ = Nothing
 
 -- * Template Expressions
-class Eq hfExp => HoleFillingExp hfExp where
-    varHFExp        :: hfExp -> Maybe String
-    hfExpToText     :: hfExp -> Text
-    parseHFExp      :: Parsec TParseError Text hfExp
+class Eq hfExp => HoleFillingExp hfExp where    
+    hfExpToText :: hfExp -> Text    
+    
+    varHFExp :: hfExp -> Maybe String
+    varHFExp = const Nothing
+
+    parseHFExp :: Maybe (Text -> Either Text hfExp)
+    parseHFExp = Nothing
 
 class HoleFillingExp hfExp => ToTemplate hfExp a where
     toTemplate :: a -> Template hfExp
+
+-- | Used to add `HoleFillingExp` constraints to functions that don't take in an
+-- explicit `Template`. This is useful for writing generic functions. For an
+-- example, see `Data.TextTemplate.QQInternal.textTemplate2QExp`.
+data Proxy hfExp r = Proxy {
+    runProxy :: r
+}
 
 instance (ToTemplate hfExp a) => ToTemplate hfExp (Either (Template hfExp) a) where
     toTemplate :: Either (Template hfExp) a -> Template hfExp
@@ -423,26 +425,33 @@ instance (ToTemplate hfExp a) => ToTemplate hfExp (Either (Template hfExp) a) wh
     toTemplate (Right a) = toTemplate a
 
 instance HoleFillingExp () where
-    varHFExp :: () -> Maybe String
-    varHFExp () = Nothing
-
     hfExpToText :: () -> Text
     hfExpToText () = ""
 
-    parseHFExp :: Parsec TParseError Text ()
-    parseHFExp = pure ()
+runParsec :: ShowErrorComponent e => Parsec e Text b -> Text -> Either Text b
+runParsec p s = case parse p "text-templates" s of
+    Left bundle -> Left . DT.pack $ errorBundlePretty bundle
+    Right t -> Right t
 
+runParsecT 
+    :: (Monad m, ShowErrorComponent e) 
+    => (m (Either (ParseErrorBundle Tok e) a) -> (Either (ParseErrorBundle Tok e) a))
+    -> ParsecT e Text m a
+    -> Text
+    -> Either Text a
+runParsecT eval p s = 
+    case eval (runParserT p "" s) of
+        Left bundle -> Left . DT.pack $ errorBundlePretty bundle
+        Right t -> Right t
+        
 instance HoleFillingExp Text where
-    varHFExp :: Text -> Maybe String
-    varHFExp _ = Nothing
-
     hfExpToText :: Text -> Text
     hfExpToText = id
 
-    parseHFExp :: Parsec TParseError Text Text
-    parseHFExp = DT.pack <$> textFillingParser
-        where
-            textFillingParser = many charTextFillingParser
+    parseHFExp :: Maybe (Text -> Either Text Text)
+    parseHFExp = Just $ runParsec textFillingParser
+        where            
+            textFillingParser = DT.pack <$> many charTextFillingParser
 
             charTextFillingParser :: Parsec TParseError Tok Char
             charTextFillingParser = choice [
@@ -455,107 +464,20 @@ instance HoleFillingExp Text where
                 skip (string "\\")
                 satisfy (`elem` ['{','}','\\'])
 
--- | A intermediate expression language for text templates where expressions
--- (`FillingExp`) fill their holes.
-type TemplateExp = Template FillingExp
+instance HoleFillingExp Int where
+  hfExpToText :: Int -> Text
+  hfExpToText = DT.show
+  
+  parseHFExp :: Maybe (Text -> Either Text Int)
+  parseHFExp = Just . runParsec @Void $ read <$> many digitChar
 
-instance ToTemplate FillingExp TemplateExp where
-    toTemplate :: TemplateExp -> Template FillingExp
-    toTemplate = id
-
--- | Hole fillings consist of meta-variables or literals which is anything that
--- can be converted into a `Data.Text.Text`.
-data FillingExp 
-    = VarFilling String  -- ^ Meta-variable
-    | LitFilling Text    -- ^ Literal filling
-
-instance HoleFillingExp FillingExp where
-    varHFExp :: FillingExp -> Maybe String
-    varHFExp (VarFilling v) = Just v
-    varHFExp _              = Nothing
-    
-    hfExpToText :: FillingExp -> Text
-    hfExpToText (VarFilling v) = DT.pack v
-    hfExpToText (LitFilling t) = t
-
-    parseHFExp :: Parsec TParseError Text FillingExp
-    parseHFExp = fillingExpParser
-
-instance Show FillingExp where
-    show :: FillingExp -> String
-    show (VarFilling x) = x
-    show (LitFilling x) = show x
-
-instance Eq FillingExp where
-    -- | Equality is alpha-equivalence.
-    (==) :: FillingExp -> FillingExp -> Bool
-    (VarFilling _)  == (VarFilling _)  = True
-    (LitFilling l1) == (LitFilling l2) = l1 == l2
-    _               == _               = False
-
--- | A hole filling meta-variable.
-varFexp :: String -> FillingExp
-varFexp = VarFilling
-
--- | A literal hole filling.
-literialFexp :: HoleFiller f => f -> FillingExp
-literialFexp = LitFilling . toFilling
-
-showASTFilling :: FillingExp -> Text
-showASTFilling (LitFilling s) = "LitFilling "<>DT.show s
-showASTFilling (VarFilling v) = "VarFilling "<>DT.show v
-
-parseVarFilling :: Text -> Either Text String
-parseVarFilling s 
-    = case parse varFillingParser "text-templates" s of
-        Left bundle -> Left . DT.pack $ errorBundlePretty bundle
-        Right (VarFilling t) -> Right t
-        _ -> error "TextTemplates.Parser: impossible branch reached in parseVarFilling."
-
-parseLitFilling :: Text -> Either Text Text
-parseLitFilling s 
-    = case parse litFillingParser "text-templates" s of
-        Left bundle -> Left . DT.pack $ errorBundlePretty bundle
-        Right (LitFilling t) -> Right t
-        _ -> error "TextTemplates.Parser: impossible branch reached in parseLitFilling."
-
-parseFillingExp :: Text -> Either Text FillingExp
-parseFillingExp s 
-    = case parse fillingExpParser "text-templates" s of
-        Left bundle -> Left . DT.pack $ errorBundlePretty bundle
-        Right t -> Right t
-
-charFillingParser :: Parsec TParseError Tok Char
-charFillingParser = choice [
-        satisfy (\c -> c /= '"' && c /= '\\'),
-        escapeCharFillingParser
-    ]
-
-escapeCharFillingParser :: Parsec TParseError Tok Char
-escapeCharFillingParser = do
-    skip (string "\\")
-    satisfy (`elem` ['"','\\'])
-
-stringFillingParser :: Parsec TParseError Tok Text
-stringFillingParser = DT.pack <$> many charFillingParser
-
-varParser :: Parsec TParseError Tok String
+varParser :: Parser String
 varParser = do
     -- Make sure we start with a lower-case ascii letter.
     c <- maybeParser . lookAhead $ takeWhile1P Nothing isAsciiLower
     if isNothing c
     then customFailure $ HFExpParseError "variables must being with a lower-case letter"
     else DT.unpack <$> takeWhile1P Nothing (\c -> isAlphaNum c && isAscii c)
-
-varFillingParser :: Parsec TParseError Tok FillingExp
-varFillingParser = VarFilling <$> varParser
-
-litFillingParser :: Parsec TParseError Tok FillingExp
-litFillingParser = LitFilling <$> doubleQuotedParser stringFillingParser
-
-fillingExpParser :: Parsec TParseError Tok FillingExp
-fillingExpParser =  litFillingParser
-                <|> varFillingParser
 
 -- | Translates a list into a template list where each template in the input
 -- list is separated by the input template.
@@ -576,11 +498,11 @@ betweenTemplate :: (ToTemplate hfExp a)
 betweenTemplate b a (toTemplate->t) = b +> t +> a
 
 -- | Add brackets `[]` around the input template.
-bracketTemplate :: TemplateExp -> TemplateExp
+bracketTemplate :: (ToTemplate hfExp a) => a -> Template hfExp
 bracketTemplate = betweenTemplate (chunk "[") (chunk "]")
 
 -- | Add braces `{}` around the input template.
-braceTemplate :: TemplateExp -> TemplateExp
+braceTemplate :: (ToTemplate hfExp a) => a -> Template hfExp
 braceTemplate = betweenTemplate (chunk "{") (chunk "}")
 
 -- | Parse a template.
@@ -589,10 +511,6 @@ parseTemplate s =
     case parse templateParser "text-templates" s of
          Left bundle -> Left . DT.pack $ errorBundlePretty bundle
          Right t -> Right t
-
--- | Convenient function for testing the parser in GHCi.
-templateParserTest :: Text -> IO ()
-templateParserTest = parseTest $ templateParser @FillingExp
 
 -- | Parse errors
 
@@ -622,7 +540,17 @@ maybeParser p = try (Just <$> p) <|> pure Nothing
 
 -- | Parse a hole's filling which must be escaped properly.
 holeFillingParser :: HoleFillingExp hfExp => Parser (Maybe hfExp)
-holeFillingParser = between (char '{') (char '}') $ maybeParser parseHFExp
+holeFillingParser = maybe (pure Nothing) p parseHFExp
+    where
+        p :: (Text -> Either Text hfExp) -> Parser (Maybe hfExp)
+        p expParser = do
+            f <- between (char '{') (char '}') $ many $ templateCharParser True
+            if L.null f
+            then pure Nothing 
+            else do let e = expParser . DT.pack $ f
+                    case e of
+                        Left err -> customFailure $ HFExpParseError err
+                        Right f' -> pure . Just $ f'
 
 -- | Parse a `Hole`. That is, a pair of a hole index and a filling.
 holeParser :: HoleFillingExp hfExp => Parser (Natural, Maybe hfExp)
