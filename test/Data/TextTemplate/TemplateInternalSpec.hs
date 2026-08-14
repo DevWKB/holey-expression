@@ -103,6 +103,6 @@ test_parseFail6 = UnitTest {
 
 test_parseFail7 :: UnitTest (Maybe (Template ()))
 test_parseFail7 = UnitTest {
-         test_result=parseTest testParseUnitTemplate "foo$1{}bar"
+         test_result=parseTest testParseUnitTemplate "foo$1{aa}bar"
         ,test_output=Nothing
     }

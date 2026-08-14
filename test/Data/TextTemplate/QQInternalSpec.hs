@@ -55,4 +55,4 @@ testHole5 :: (Template (),Template ())
 testHole5 = ([unitTemplate|Hi ❤️, $1{} ‼|], Template (ICompose "Hi ❤️, " 1 (IChunk " ‼")) ([1],M.empty))
 
 testFilledHole1 :: (Template Text,Template Text)
-testFilledHole1 = ([textTemplate|before-$1{"example filling"}-and-after|], Template (ICompose "before-" 1 (IChunk "-and-after")) ([],M.fromList [(1,"example filling")]))
+testFilledHole1 = ([textTemplate|before-$1{example filling}-and-after|], Template (ICompose "before-" 1 (IChunk "-and-after")) ([],M.fromList [(1,"example filling")]))

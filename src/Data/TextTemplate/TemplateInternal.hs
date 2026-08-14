@@ -540,8 +540,11 @@ maybeParser p = try (Just <$> p) <|> pure Nothing
 
 -- | Parse a hole's filling which must be escaped properly.
 holeFillingParser :: HoleFillingExp hfExp => Parser (Maybe hfExp)
-holeFillingParser = maybe (pure Nothing) p parseHFExp
+holeFillingParser = maybe n p parseHFExp
     where
+        -- If there is no filling, then skip the braces.
+        n = (skip $ string "{}") >> pure Nothing
+
         p :: (Text -> Either Text hfExp) -> Parser (Maybe hfExp)
         p expParser = do
             f <- between (char '{') (char '}') $ many $ templateCharParser True

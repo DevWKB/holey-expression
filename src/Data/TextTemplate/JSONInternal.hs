@@ -195,7 +195,7 @@ instance ShowErrorComponent JTParseError where
     showErrorComponent JTPEInvalidVarName     = "variables must begin with a lower-case letter and only consist of ASCII alpha-numeric characters"
 
 -- | Type of tokens.
-type Tok    = DT.Text
+type Tok = DT.Text
 -- | Type of parse errors.
 type ParseError = ParseErrorBundle Tok JTParseError
 -- | Type of the parsers that operate on a stream of `Tok`. The state holds onto
