@@ -1,15 +1,14 @@
-cabal-version: 2.2
-
+cabal-version: 2.4
 name:           text-templates
 version:        0.1.0.0
+license:        BSD-3-Clause
+license-file:   LICENSE.md
+author:         Harley Eades III
+maintainer:     harley.eades@wbee.fit
 description:    Please see the README on GitHub at <https://github.com/heades/text-templates#readme>
 homepage:       https://github.com/heades/text-templates#readme
 bug-reports:    https://github.com/heades/text-templates/issues
-author:         Harley Eades III
-maintainer:     harley.eades@wbee.fit
-copyright:      BSD-3-Clause
-license:        BSD-3-Clause
-license-file:   LICENSE
+
 build-type:     Simple
 extra-source-files:
     README.md
