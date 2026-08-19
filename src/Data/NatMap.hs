@@ -2,8 +2,8 @@
 Module      : NatMap
 Description : Map with natural number keys
 Copyright   : (c) Harley Eades, 2026
-              (c) WꓘB, 2026
-Maintainer  : harley.eades@pm.me
+              (c) W⋊B, 2026
+Maintainer  : harley.eades@gmail.com
 
 This is a simple wrapper around `Data.IntMap.Lazy.IntMap` restricting the keys to the
 natural numbers.

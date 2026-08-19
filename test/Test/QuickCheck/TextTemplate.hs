@@ -2,8 +2,8 @@
 Module      : TextTemplate
 Description : Generation of random text templates
 Copyright   : (c) Harley Eades, 2026
-              (c) WꓘB, 2026
-Maintainer  : harley.eades@pm.me
+              (c) W⋊B, 2026
+Maintainer  : harley.eades@gmail.com
 
 Includes a generator for QuickCheck to randomly generate text templates to be
 used for property-based testing.

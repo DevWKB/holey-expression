@@ -2,8 +2,8 @@
 Module      : TemplateInternalSpec
 Description : Testing spec for the text template API
 Copyright   : (c) Harley Eades, 2026
-              (c) WꓘB, 2026
-Maintainer  : harley.eades@pm.me
+              (c) W⋊B, 2026
+Maintainer  : harley.eades@gmail.com
 
 Various properties of the internals of the text templates API.
 -}

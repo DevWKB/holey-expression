@@ -2,20 +2,21 @@
 Module      : Helpers
 Description : Useful helpers for unit testing
 Copyright   : (c) Harley Eades, 2026
-              (c) WꓘB, 2026
-Maintainer  : harley.eades@pm.me
+              (c) W⋊B, 2026
+Maintainer  : harley.eades@gmail.com
 
 -}
-module Test.Helpers 
-    (UnitTest(..)
-    ,test_case
-    ,testParser                
-    ,testParseFile
-    ,parseTest) where
+module Test.Helpers (UnitTest(..)
+                    ,test_case
+                    ,testParser                
+                    ,testParseFile
+                    ,parseTest) where
 
 import Test.Hspec
 import Text.Megaparsec   (ParsecT
-                         ,ParseErrorBundle, parse, Parsec)
+                         ,ParseErrorBundle
+                         ,parse
+                         ,Parsec)
 import Data.Maybe        (isJust)
 import Data.Either.Extra (eitherToMaybe)
 

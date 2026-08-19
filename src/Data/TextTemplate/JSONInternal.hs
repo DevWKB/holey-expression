@@ -2,8 +2,8 @@
 Module      : JSON Templates
 Description : Text templates for JSON
 Copyright   : (c) Harley Eades, 2026
-              (c) WꓘB, 2026
-Maintainer  : harley.eades@pm.me
+              (c) W⋊B, 2026
+Maintainer  : harley.eades@gmail.com
 
 Text templates for JSON. The main use of this library is to test JSON
 encoders/decoders, but there could be more use cases. This API is designed with

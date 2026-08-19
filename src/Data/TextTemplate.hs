@@ -2,7 +2,7 @@
 Module      : Template
 Description : Framework for creating text templates
 Copyright   : (c) Harley Eades, 2026
-              (c) WꓘB, 2026
+              (c) W⋊B, 2026
 Maintainer  : harley.eades@gmail.me
 
 Framework for creating text templates. These are text with holes that can
