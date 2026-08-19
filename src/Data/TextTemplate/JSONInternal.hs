@@ -22,51 +22,75 @@ Notes (need to explain):
 {-# LANGUAGE MultiParamTypeClasses #-}
 module  Data.TextTemplate.JSONInternal where
 
-import Text.Megaparsec            (Parsec
-                                  ,ParseErrorBundle
-                                  ,between
-                                  ,skipCount
-                                  ,many
-                                  ,satisfy
-                                  ,choice
-                                  ,(<|>)
-                                  ,errorBundlePretty
-                                  ,sepBy1
-                                  ,sepBy
-                                  ,MonadParsec (try, eof, lookAhead, takeWhile1P), customFailure, ShowErrorComponent, unexpected, (<?>), ParsecT, runParserT, count, takeWhileP)
-import Data.Text                  (Text)
-import Data.Text                  qualified as DT
-import Data.Void                  (Void)
-import Text.Megaparsec.Char       (string
-                                  ,space, space1)
-import Data.Char                  (isPrint, isHexDigit, chr, generalCategory, isDigit, isAsciiLower, isAscii, isAlphaNum)
-import Text.Megaparsec.Char.Lexer (float
-                                  ,decimal
-                                  ,symbol, signed)
-import Language.Haskell.TH        qualified as TH
-import Language.Haskell.TH.Quote  (QuasiQuoter(..))
-import Language.Haskell.TH.Quote  qualified as TH
-import Data.TextTemplate        ((+>)
-                                  ,chunk
-                                  ,Template) 
+import Text.Megaparsec                    (Parsec
+                                          ,ParseErrorBundle
+                                          ,between
+                                          ,skipCount
+                                          ,many
+                                          ,satisfy
+                                          ,choice
+                                          ,(<|>)
+                                          ,errorBundlePretty
+                                          ,sepBy1
+                                          ,sepBy
+                                          ,MonadParsec (..)
+                                          ,customFailure
+                                          ,ShowErrorComponent
+                                          ,unexpected
+                                          ,(<?>)
+                                          ,ParsecT
+                                          ,runParserT
+                                          ,count
+                                          ,takeWhileP)
+import Data.Text                          (Text)
+import Data.Text                          qualified as DT
+import Data.Void                          (Void)
+import Text.Megaparsec.Char               (string
+                                          ,space
+                                          ,space1)
+import Data.Char                          (isPrint
+                                          ,isHexDigit
+                                          ,chr
+                                          ,generalCategory
+                                          ,isDigit
+                                          ,isAsciiLower
+                                          ,isAscii
+                                          ,isAlphaNum)
+import Text.Megaparsec.Char.Lexer         (float
+                                          ,decimal
+                                          ,symbol, signed)
+import Language.Haskell.TH                qualified as TH
+import Language.Haskell.TH.Quote          (QuasiQuoter(..))
+import Language.Haskell.TH.Quote          qualified as TH
+import Data.TextTemplate.TemplateInternal ((+>)
+                                          ,chunk
+                                          ,Template
+                                          ,ToTemplate (..)
+                                          ,HoleFillingExp) 
 import Data.TextTemplate.TemplateInternal qualified as StrT
 import Data.TextTemplate.Text             qualified as StrT
 import Data.TextTemplate.QQInternal       qualified as StrT
-import Numeric (readHex)
-import Text.Megaparsec.Error (ShowErrorComponent(..), ErrorItem (..))
-import Data.List.NonEmpty (fromList)
-import Control.Monad.State (State, evalState, MonadTrans (..), MonadState (..), evalStateT)
-import Data.TextTemplate.TemplateInternal (HoleFillingExp, ToTemplate (..), TParseError)
-import Data.Maybe (isNothing)
+import Data.TextTemplate                  qualified as StrT
+import Numeric                            (readHex)
+import Text.Megaparsec.Error              (ShowErrorComponent(..)
+                                          ,ErrorItem (..))
+import Data.List.NonEmpty                 (fromList)
+import Control.Monad.State                (State
+                                          ,evalState
+                                          ,MonadTrans (..)
+                                          ,MonadState (..)
+                                          ,evalStateT)
+import Data.Maybe                         (isNothing)
+import Data.String                        (IsString (..))
 
 -- * Templates + Filling Expressions
 
 -- | A intermediate expression language for text templates where expressions
 -- (`FillingExp`) fill their holes.
-type TemplateExp = Template FillingExp
+type TemplateExp = Template Text FillingExp
 
-instance ToTemplate FillingExp TemplateExp where
-    toTemplate :: TemplateExp -> Template FillingExp
+instance ToTemplate Text FillingExp TemplateExp where
+    toTemplate :: TemplateExp -> Template Text FillingExp
     toTemplate = id
 
 -- | Hole fillings consist of meta-variables or literals which is anything that
@@ -75,9 +99,9 @@ data FillingExp
     = VarFilling String  -- ^ Meta-variable
     | LitFilling Text    -- ^ Literal filling
 
-instance HoleFillingExp FillingExp where
-    varHFExp :: FillingExp -> Maybe String
-    varHFExp (VarFilling v) = Just v
+instance HoleFillingExp Text FillingExp where
+    varHFExp :: FillingExp -> Maybe Text
+    varHFExp (VarFilling v) = Just . DT.pack $ v
     varHFExp _              = Nothing
     
     hfExpToText :: FillingExp -> Text
@@ -124,12 +148,12 @@ value (BoolV  True)  = chunk "true"
 value (BoolV  False) = chunk "false"
 value NullV          = chunk "null"
 
-instance ToTemplate FillingExp Field where
-    toTemplate :: Field -> Template FillingExp
+instance ToTemplate Text FillingExp Field where
+    toTemplate :: Field -> Template Text FillingExp
     toTemplate = field
 
-instance ToTemplate FillingExp Value where
-    toTemplate :: Value -> Template FillingExp
+instance ToTemplate Text FillingExp Value where
+    toTemplate :: Value -> Template Text FillingExp
     toTemplate = value
 
 -- * Creating JSON templates
@@ -137,7 +161,7 @@ instance ToTemplate FillingExp Value where
 -- | Create a template from a JSON object.
 object :: [Field] -- ^ List of fields of the object
        -> TemplateExp
-object fields = StrT.betweenTemplate (chunk "{") (chunk "}") $ StrT.sepTemplatesBy @FillingExp (chunk ",") fields
+object fields = StrT.betweenTemplate (chunk "{") (chunk "}") $ StrT.sepTemplatesBy @Text @FillingExp (chunk ",") fields
 
 --- | Create a template of a field of an object.
 field :: Field -- ^ Field of the object
@@ -152,7 +176,7 @@ fieldLabel = chunk . (<> ":") . StrT.doubleQuote
 -- | Create a template of an array value.
 array :: [Either TemplateExp Value] -- ^ List of values of the array
       -> TemplateExp
-array = StrT.bracketTemplate . StrT.sepTemplatesBy @FillingExp (chunk ",")
+array = StrT.bracketTemplate . StrT.sepTemplatesBy @Text @FillingExp (chunk ",")
 
 -- * Quasi-quoter for JSON templates
 

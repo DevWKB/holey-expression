@@ -7,3 +7,6 @@
 # Quick Start
 
 TBA
+
+# Internals
+- We require `Eq text, Monoid text`

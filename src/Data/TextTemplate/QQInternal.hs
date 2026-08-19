@@ -3,7 +3,7 @@ Module      : QQInternal
 Description : Quasi-Quoter for Templates
 Copyright   : (c) Harley Eades, 2026
               (c) WꓘB, 2026
-Maintainer  : harley.eades@pm.me
+Maintainer  : harley.eades@gmail.com
 
 Includes parsers for templates as well as a quasi-quoter 
 for generating templates at compile time.
@@ -12,23 +12,33 @@ for generating templates at compile time.
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Data.TextTemplate.QQInternal where
 
-import Language.Haskell.TH (Q
-                           ,Exp
-                           ,Name)
-import GHC.Natural         (Natural)
-import Language.Haskell.TH qualified as TH
-import Data.Text           qualified as DT
-
-import Data.TextTemplate.TemplateInternal
-import Language.Haskell.TH.Quote (QuasiQuoter(..))
-import Data.Text (Text)
+import GHC.Natural                        (Natural)
+import Data.Text                          qualified as DT
+import Data.Text                          (Text)
+import Language.Haskell.TH.Quote          (QuasiQuoter(..))
+import Language.Haskell.TH                qualified as TH
+import Language.Haskell.TH                (Q
+                                          ,Exp
+                                          ,Name)
+import Data.TextTemplate.TemplateInternal (Hole
+                                          ,HoleProps
+                                          ,Template(..)
+                                          ,HoleFillingExp(hfExpToText, varHFExp)
+                                          ,ITemplate(..)
+                                          ,TextLike(toText)
+                                          ,Proxy(..)
+                                          ,pattern EmptyHole
+                                          ,pattern FilledHole
+                                          ,pattern UndefHole)
+import Data.TextTemplate                  (parseTemplate)
 
 -- | Text templates quasi quoter which contain `Text` filling.
 textTemplate :: QuasiQuoter
 textTemplate = QuasiQuoter {
-    quoteExp  = textTemplate2QExp . Proxy @Text
+    quoteExp  = textTemplate2QExp . Proxy @Text . DT.pack
    ,quotePat  = undefined
    ,quoteDec  = undefined
    ,quoteType = undefined
@@ -37,7 +47,7 @@ textTemplate = QuasiQuoter {
 -- | Text templates quasi quoter which contain no (@Unit@) filling.
 unitTemplate :: QuasiQuoter
 unitTemplate = QuasiQuoter {
-    quoteExp  = textTemplate2QExp . Proxy @()
+    quoteExp  = textTemplate2QExp . Proxy @() . DT.pack
    ,quotePat  = undefined
    ,quoteDec  = undefined
    ,quoteType = undefined
@@ -46,43 +56,45 @@ unitTemplate = QuasiQuoter {
 -- | Text templates quasi quoter which contain integer (@Int@) filling.
 intTemplate :: QuasiQuoter
 intTemplate = QuasiQuoter {
-    quoteExp  = textTemplate2QExp . Proxy @Int
+    quoteExp  = textTemplate2QExp . Proxy @Text . DT.pack
    ,quotePat  = undefined
    ,quoteDec  = undefined
    ,quoteType = undefined
 }
 
 --- | Parses a string into `Template Text` and then into a Template Haskell expression.
-textTemplate2QExp :: HoleFillingExp hfExp
-                  => Proxy hfExp String    -- ^ String to parse as a textTemplate
+textTemplate2QExp :: HoleFillingExp Text filling
+                  => Proxy filling Text    -- ^ String to parse as a textTemplate
                   -> Q Exp
-textTemplate2QExp @hfExp =  (flip (.) (parseTemplate @hfExp . DT.pack . runProxy) $ \case {
+textTemplate2QExp @filling =  (flip (.) (parseTemplate @filling . runProxy) $ \case {
          Right t  -> template2QExp t
         ;Left err -> fail $ DT.unpack err
     })
 
-
 -- | Convert a `Hole` into a Template Haskell expression.
-hole2QExp :: HoleFillingExp hfExp => Hole hfExp -> Q Exp
-hole2QExp (EmptyHole  i   _) = appCombinator1 (TH.mkName "hole") (mkNaturalLit i)
-hole2QExp (FilledHole i f _) = 
+hole2QExp :: (TextLike text,HoleFillingExp text filling) => Proxy text (Hole filling) -> Q Exp
+hole2QExp (Proxy (EmptyHole  i   _)) = appCombinator1 (TH.mkName "hole") (mkNaturalLit i)
+hole2QExp @text (Proxy (FilledHole i f _)) = 
     appCombinator2 (TH.mkName "filled") (mkNaturalLit i) $        
-        case varHFExp f of
-            (Just v) -> TH.varE . TH.mkName $ v
-            Nothing  -> TH.stringE . DT.unpack $ hfExpToText f
-hole2QExp (UndefHole i _) = error $ "QQ error: hole index "
-                                 <> (show i)
-                                 <> " present in internal textTemplate, but not defined in the templates hole properties."
+        case varHFExp @text f of
+            (Just v) -> TH.varE . TH.mkName . DT.unpack . toText $ v
+            Nothing  -> TH.stringE . DT.unpack . toText $ hfExpToText @text f
+hole2QExp (Proxy (UndefHole i _)) = error $ "QQ error: hole index "
+                                  <> (show i)
+                                  <> " present in internal textTemplate, but not defined in the templates hole properties."
 
 -- | Convert an `ITemplate` into a Template Haskell expression.
-iTemplate2QExp :: HoleFillingExp hfExp => ITemplate -> HoleProps hfExp -> Q Exp
+iTemplate2QExp :: (TextLike text, HoleFillingExp text filling) 
+               => ITemplate text 
+               -> HoleProps filling 
+               -> Q Exp
 iTemplate2QExp (IChunk chk) _ = do
     let chunk = TH.mkName "chunk"
-    appCombinator1 chunk $ mkTextLit chk  
-iTemplate2QExp (ICompose p h r) hlsProps = do
+    appCombinator1 chunk $ mkTextLit . toText $ chk  
+iTemplate2QExp @text @filling (ICompose p h r) hlsProps = do
     -- ICompose p h r = (chunk p) +> (hole h) +> r
     let pExp      = iTemplate2QExp (IChunk p) hlsProps
-    let hExp      = hole2QExp (h,hlsProps)
+    let hExp      = hole2QExp (Proxy @text @(Hole filling) (h, hlsProps))
     let rExp      = iTemplate2QExp r hlsProps
     let compose   = appInfixCombinator (TH.mkName "+>")
     (pExp `compose` hExp) `compose` rExp
@@ -98,7 +110,7 @@ appInfixCombinator constName e1 e2 = TH.infixE (Just e1) (TH.varE constName) (Ju
 -- | Convert a type that can be converted into a textTemplate into a Template
 -- Haskell expression. Use this to create new quasi-quoters for types that
 -- convert to textTemplate.
-template2QExp :: HoleFillingExp hfExp => Template hfExp -> Q Exp
+template2QExp :: (TextLike text,HoleFillingExp text filling) => Template text filling -> Q Exp
 template2QExp (Template it hls) = iTemplate2QExp it hls
 
 -- * Helpful Template Haskell combinators.
