@@ -52,7 +52,9 @@ library
   import: depends
   exposed-modules:
       Data.TextTemplate
+      Data.TextTemplate.Template
       Data.TextTemplate.TemplateInternal
+      Data.TextTemplate.TextTemplateQQ
       Data.TextTemplate.QQInternal
       Data.TextTemplate.Text
       Data.TextTemplate.JSON

@@ -10,3 +10,5 @@ TBA
 
 # Internals
 - We require `Eq text, Monoid text`
+
+[hackage]: https://hackage.haskell.org/package/megaparsec
