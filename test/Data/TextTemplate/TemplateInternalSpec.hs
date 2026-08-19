@@ -11,9 +11,10 @@ Various properties of the internals of the text templates API.
 module  Data.TextTemplate.TemplateInternalSpec (spec) where
 
 import Test.Hspec            
-import Test.QuickCheck.TextTemplate
+import Test.QuickCheck.Template
 import Test.Helpers                       (parseTest)
 import Data.TextTemplate.TemplateInternal
+import Data.TextTemplate
 import Test.QuickCheck                     (Property
                                            ,Testable (property)
                                            ,verboseCheck
@@ -46,62 +47,62 @@ spec = do
                 test_case "filling in unit template" test_parseFail7
 
 prop_associativeCompose 
-    :: Template Text 
-    -> Template Text 
-    -> Template Text 
+    :: Template Text Text
+    -> Template Text Text
+    -> Template Text Text
     -> Property
 prop_associativeCompose t1 t2 t3 = property $ 
     t1 +> (t2 +> t3) == (t1 +> t2) +> t3
 
 prop_identityCompose 
-    :: Template Text 
+    :: Template Text Text
     -> Property
 prop_identityCompose t = property $ 
     (empty +> t) == t && (t +> empty) == t
 
-testParseTextTemplate :: Parser (Template Text)
+testParseTextTemplate :: Parser (Template Text Text)
 testParseTextTemplate = templateParser
 
-testParseUnitTemplate :: Parser (Template ())
+testParseUnitTemplate :: Parser (Template Text ())
 testParseUnitTemplate = templateParser
 
-test_parseFail1 :: UnitTest (Maybe (Template Text))
+test_parseFail1 :: UnitTest (Maybe (Template Text Text))
 test_parseFail1 = UnitTest {
          test_result=parseTest testParseTextTemplate "foo${a}"
         ,test_output=Nothing
     }
 
-test_parseFail2 :: UnitTest (Maybe (Template Text))
+test_parseFail2 :: UnitTest (Maybe (Template Text Text))
 test_parseFail2 = UnitTest {
          test_result=parseTest testParseTextTemplate "foo$-1{a}"
         ,test_output=Nothing
     }
 
-test_parseFail3 :: UnitTest (Maybe (Template Text))
+test_parseFail3 :: UnitTest (Maybe (Template Text Text))
 test_parseFail3 = UnitTest {
          test_result=parseTest testParseTextTemplate "foo$1a}bar"
         ,test_output=Nothing
     }
 
-test_parseFail4 :: UnitTest (Maybe (Template Text))
+test_parseFail4 :: UnitTest (Maybe (Template Text Text))
 test_parseFail4 = UnitTest {
          test_result=parseTest testParseTextTemplate "foo$1{abar"
         ,test_output=Nothing
     }
 
-test_parseFail5 :: UnitTest (Maybe (Template Text))
+test_parseFail5 :: UnitTest (Maybe (Template Text Text))
 test_parseFail5 = UnitTest {
          test_result=parseTest testParseTextTemplate "foo$1{{a}bar"
         ,test_output=Nothing
     }
 
-test_parseFail6 :: UnitTest (Maybe (Template Text))
+test_parseFail6 :: UnitTest (Maybe (Template Text Text))
 test_parseFail6 = UnitTest {
          test_result=parseTest testParseTextTemplate "foo$1{\\a}bar"
         ,test_output=Nothing
     }
 
-test_parseFail7 :: UnitTest (Maybe (Template ()))
+test_parseFail7 :: UnitTest (Maybe (Template Text ()))
 test_parseFail7 = UnitTest {
          test_result=parseTest testParseUnitTemplate "foo$1{aa}bar"
         ,test_output=Nothing

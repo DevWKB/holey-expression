@@ -29,9 +29,7 @@ import Data.TextTemplate.TemplateInternal (Template
                                           ,(+>)
                                           ,chunk
                                           ,hole
-                                          ,filled, HoleFillingExp (..), TParseError,varParser)
-import Text.Megaparsec (Parsec, many, (<|>))
-import Text.Megaparsec.Char (digitChar)
+                                          ,filled)
 
 spec :: Spec
 spec = do    
@@ -128,20 +126,20 @@ test_empty = UnitTest {
 -- ** Booleans
 test_bool1 :: UnitTest Text
 test_bool1 = UnitTest {
-         test_output = DT.show ([jsonTemplate|true|] :: Template ())
+         test_output = DT.show ([jsonTemplate|true|] :: Template Text ())
         ,test_result = "true"
     }
 
 test_bool0 :: UnitTest Text
 test_bool0 = UnitTest {
-         test_output = DT.show ([jsonTemplate|false|] :: Template ())
+         test_output = DT.show ([jsonTemplate|false|] :: Template Text ())
         ,test_result = "false"
     }
 
 -- ** Null
 test_null :: UnitTest Text
 test_null = UnitTest {
-         test_output = DT.show ([jsonTemplate|null|] :: Template ())
+         test_output = DT.show ([jsonTemplate|null|] :: Template Text ())
         ,test_result = "null"
     }
 
@@ -227,13 +225,13 @@ test_number2 = UnitTest {
 -- * Arrays
 test_array1 :: UnitTest Text
 test_array1 = UnitTest {
-         test_output = (DT.show ([jsonTemplate|["1"]|] :: Template ()))
+         test_output = (DT.show ([jsonTemplate|["1"]|] :: Template Text ()))
         ,test_result = "[\"1\"]"
     }
 
 test_array2 :: UnitTest Text
 test_array2 = UnitTest {
-         test_output = DT.show ([jsonTemplate|["1",'$1{}',3]|] :: Template ())
+         test_output = DT.show ([jsonTemplate|["1",'$1{}',3]|] :: Template Text ())
         ,test_result = "[\"1\",$1{},3]"
     }
 
@@ -490,7 +488,7 @@ test_object19 = UnitTest {
 
 -- * Template Functions
 
-test_templateFun1 :: Int -> UnitTest (Template Int)
+test_templateFun1 :: Int -> UnitTest (Template Text Int)
 test_templateFun1 v = UnitTest {
         test_output = [jsonTemplate|{"field1": '$1{v}'}|]
        ,test_result = chunk "{\"field1\":" +> filled 1 v +> chunk "}"

@@ -26,7 +26,11 @@ module Data.TextTemplate (-- * Text Templates
                            bracketTemplate
                           ,braceTemplate
                           -- ** Parsing
+                          ,Parser
+                          ,TParseError
+                          ,templateParser
                           ,parseTemplate
+                          ,varParser                          
                           -- *** Helpers
                           ,maybeParser
                           ,doubleQuotedParser
@@ -88,8 +92,8 @@ instance HoleFillingExp Text Int where
   parseHFExp :: Maybe (Text -> Either Text Int)
   parseHFExp = Just . runParsec @Void $ read <$> many digitChar
 
-_varParser :: Parser String
-_varParser = do
+varParser :: Parser String
+varParser = do
     -- Make sure we start with a lower-case ascii letter.
     c <- maybeParser . lookAhead $ takeWhile1P Nothing isAsciiLower
     if isNothing c

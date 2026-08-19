@@ -95,7 +95,7 @@ test-suite text-templates-test
       Data.TextTemplate.TemplateInternalSpec
       Data.TextTemplate.QQInternalSpec      
       Data.TextTemplate.JSONInternalSpec
-      Test.QuickCheck.TextTemplate
+      Test.QuickCheck.Template
       Test.Helpers
   autogen-modules:
       Paths_text_templates

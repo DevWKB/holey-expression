@@ -92,9 +92,9 @@ emptyHoleProps = ([], M.empty)
 -- unfilled hole, otherwise it's added as a filled hole. The given index cannot
 -- already exist in the hole properties.
 updateFreshHolePropsWith 
-    :: HoleProps Text 
-    -> (Natural,Maybe Text) 
-    -> HoleProps Text
+    :: HoleProps text 
+    -> (Natural,Maybe text) 
+    -> HoleProps text
 updateFreshHolePropsWith holeProps@(hls, fhls) (h, Nothing)  | h `isFreshHoleIndex` holeProps = (h:hls,fhls)
 updateFreshHolePropsWith holeProps@(hls, fhls) (h, (Just f)) | h `isFreshHoleIndex` holeProps = (hls,insert h f fhls)
 updateFreshHolePropsWith holeProps             (_,_)                                          = holeProps
@@ -113,11 +113,11 @@ data Template text filling where
 
 instance (TextLike text, HoleFillingExp text filling) => Show (Template text filling) where
     show :: Template text filling -> String    
-    show (Template (IChunk t) _) = show . toText $ t    
+    show (Template (IChunk t) _) = DT.unpack . toText $ t    
     show (Template (ICompose prefix i rest) (emptyHoles, filledHoles))
-        = (show . toText $ prefix) 
+        = (DT.unpack . toText $ prefix) 
         <> "$" <> show i <> "{"
-        <> (if i `elem` emptyHoles then "" else (show . toText . (hfExpToText @text) $ filledHoles ! i))
+        <> (if i `elem` emptyHoles then "" else (DT.unpack . toText . (hfExpToText @text) $ filledHoles ! i))
         <> "}" 
         <> show (Template rest (emptyHoles, filledHoles))
 
