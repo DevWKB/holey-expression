@@ -39,8 +39,8 @@ prettyList f = brackets . aux
         aux [x]    = f x
         aux (x:xs) = f x <> ", " <> aux xs
 
--- Convert the input double into a human-readable format. This drops the decimal
--- point when the input is a whole number.
+-- | Convert the input double into a human-readable format. This drops the
+-- decimal point when the input is a whole number.
 prettyDouble :: Double -> Text
 prettyDouble (DT.show->n) =     
     case DT.break (=='.') n of

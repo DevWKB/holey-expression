@@ -1,29 +1,56 @@
 {-|
-Module      : Template
+Module      : TextTemplate
 Description : Framework for creating text templates
 Copyright   : (c) Harley Eades, 2026
               (c) W⋊B, 2026
 Maintainer  : harley.eades@gmail.me
 
-Framework for creating text templates. These are text with holes that can
-be filled and plugged. No parsing of the actual text is done, but the text
-is broken up into `chunk`'s in between the `hole`'s. Then a fill or plug
-function can be defined to replace the holes with text; see `fillHole` and
-`plugHole`. 
+Templates are essentially monoids with two types of elements "chunks of text"
+and "holes". Then when all holes are plugged in a template it corresponds to a
+piece of text.
 
-The recommended way to programmatically generate templates is to use the
-quasi-quoter which makes writing templates easier. If you don't want to depend
-on Template Haskell, then we strongly recommend to use the template combinators,
-because they keep track of internal state to make certain operations on
-templates efficient.
+A simple example using `Data.Text`:
+
+> ghci> let t = (chunk "Today's Temperature: ") +> (hole 1) +> (chunk " high/") +> (hole 2) +> (chunk " low") :: Template Text Double
+
+Then if we plug the two holes in @t@ we obtain:
+
+> ghci> plugAll t $ \_ -> \i -> if i == 1 then Just 91.2 else if i == 2 then Just 87.0 else Nothing
+> Just "Today's Temperature: 91.2 high/87.0 low"
+
+The above is an example of a Text template of type @Template Text Double@ where
+the first type is the type we are ultimately constructing a value of when all
+holes are plugged, and the second type is the type of the filling we place in
+the holes.
+
+We can think of @t@ as the following:
+
+> Today's Temperature: $1{} high/$2{} low
+
+In fact, using the quasi-quoters defined in `Data.TextTemplate.TextTemplateQQ` we can write it
+this way:
+
+> ghci> let t' = [textTemplate|Today\'s Temperature: $1{} high/$2{} low|] :: Template Text Double
+> ghci> t ==> t'
+> True
+
+A third way we can write the same template using @OverloadedStrings@ is:
+
+> ghci> let t'' = "Today's Temperature: " <> (hole 1) <> " high/" <> (hole 2) <> " low" :: Template Text Double
+> ghci> t ==> t''
+> True
+
 -}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
-module Data.TextTemplate (-- * Text Templates
-                           bracketTemplate
+{-# LANGUAGE FlexibleInstances #-}
+module Data.TextTemplate  (-- * Templates
+                           module Data.TextTemplate.Template
+                           -- * Text Templates
+                          ,bracketTemplate
                           ,braceTemplate
                           -- ** Parsing
                           ,Parser
@@ -36,7 +63,7 @@ module Data.TextTemplate (-- * Text Templates
                           ,doubleQuotedParser
                           ,runParsecT) where
 
-import Data.TextTemplate.TemplateInternal (Template,HoleFillingExp(..),ToTemplate,chunk,pattern Chunk,pattern Compose,betweenTemplate)
+import Data.TextTemplate.Template 
 import Text.Megaparsec (ShowErrorComponent (..), ParseErrorBundle, ParsecT, Parsec, MonadParsec (..), parse, errorBundlePretty, runParserT, many, choice, satisfy, customFailure, some, (<|>), atEnd, skipCount, between)
 import Data.Text (Text)
 import Data.Void (Void)
@@ -49,11 +76,18 @@ import Data.Maybe (isNothing)
 import qualified Data.List as L
 import Text.Megaparsec.Byte.Lexer (symbol)
 
+-- | Type of tokens.
+type Tok = Text
+
+-- | Combinator for running a `Parsec` parser with a `Text` input stream and
+-- custom error messages.
 runParsec :: ShowErrorComponent e => Parsec e Text b -> Text -> Either Text b
 runParsec p s = case parse p "text-templates" s of
     Left bundle -> Left . DT.pack $ errorBundlePretty bundle
     Right t -> Right t
 
+-- | Combinator for running a `ParsecT` parser with a `Text` input stream and
+-- custom error messages.
 runParsecT 
     :: (Monad m, ShowErrorComponent e) 
     => (m (Either (ParseErrorBundle Tok e) a) -> (Either (ParseErrorBundle Tok e) a))
@@ -92,12 +126,22 @@ instance HoleFillingExp Text Int where
   parseHFExp :: Maybe (Text -> Either Text Int)
   parseHFExp = Just . runParsec @Void $ read <$> many digitChar
 
+instance TextLike Double where
+    toText :: Double -> Text
+    toText = DT.show
+
+instance HoleFillingExp Text Double where
+    hfExpToText :: Double -> Text
+    hfExpToText = DT.show
+
+-- | Parses a variable as a string. Variables must begin with a lower-case ascii
+-- letter, and then contain ascii alpha-numeric characters.
 varParser :: Parser String
 varParser = do
     -- Make sure we start with a lower-case ascii letter.
     c <- maybeParser . lookAhead $ takeWhile1P Nothing isAsciiLower
     if isNothing c
-    then customFailure $ HFExpParseError "variables must being with a lower-case letter"
+    then customFailure $ HFExpParseError "variables must begin with a lower-case letter"
     else DT.unpack <$> takeWhile1P Nothing (\c -> isAlphaNum c && isAscii c)
 
 -- | Add brackets `[]` around the input template.
@@ -127,9 +171,7 @@ instance ShowErrorComponent TParseError where
         where
             showErrorComponent' (HFExpParseError err) = DT.unpack err
 
--- | Type of tokens.
-type Tok    = Text
--- | Type of the parsers that operate on a stream of `Tok`.
+-- | Type of the parsers that operate on a stream of t`Text`.
 type Parser = Parsec TParseError Tok 
 
 -- | Parse a hole index (`Natural`).
@@ -138,6 +180,8 @@ holeIndexParser = do
     ds <- some digitChar
     pure . read $ ds
 
+-- | Parser combinator that attempts to parse using the input parser, and if it
+-- fails, returns @Nothing@.
 maybeParser :: MonadParsec e s f => f a -> f (Maybe a)
 maybeParser p = try (Just <$> p) <|> pure Nothing
 
@@ -158,7 +202,7 @@ holeFillingParser = maybe n p (parseHFExp @Text)
                         Left err -> customFailure $ HFExpParseError err
                         Right f' -> pure . Just $ f'
 
--- | Parse a `Hole`. That is, a pair of a hole index and a filling.
+-- | Parse a `Data.TextTemplate.Hole`. That is, a pair of a hole index and a filling.
 holeParser :: HoleFillingExp Text filling => Parser (Natural, Maybe filling)
 holeParser = do
     skip (string "$")
@@ -182,7 +226,9 @@ templateParser = do
             pure $ Compose mc h t
 
 -- | Parse a template character. These are any unicode character where the
--- characters @['$','{','}','\\']@ are escaped when parsing a hole's filling,
+-- characters 
+-- > ["$","{","}","\\"] 
+-- are escaped when parsing a hole's filling,
 -- otherwise just @'$'@ needs to be escaped.
 templateCharParser :: Bool -> Parser Char
 templateCharParser filling = choice [
@@ -190,7 +236,9 @@ templateCharParser filling = choice [
         escapedTemplateCharParser
     ]
 
--- | Parsed an escaped character; one of, @["\\$"","\\{"","\\}","\\\\"]@.
+-- | Parsed an escaped character; one of, 
+-- > ["\\$"","\\{"","\\}","\\\\"]
+-- .
 escapedTemplateCharParser :: Parser Char
 escapedTemplateCharParser = do
     skipCount 1 (char '\\')

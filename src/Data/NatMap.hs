@@ -44,7 +44,7 @@ import Data.IntMap.Lazy (IntMap)
 import Data.IntMap.Lazy qualified as M
 import Prelude          hiding (null)
 
--- | A map of natural numbers to values `f`.
+-- | A map of natural numbers to values @f@.
 type NatMap f = IntMap f
 
 -- | Convert a natural number into an integer (`Int`).

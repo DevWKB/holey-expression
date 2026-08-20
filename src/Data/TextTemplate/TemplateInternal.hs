@@ -1,16 +1,9 @@
 {-|
-Module      : Template
-Description : Framework for creating text templates
+Module      : TemplateInternal
+Description : Internal framework for creating templates
 Copyright   : (c) Harley Eades, 2026
               (c) W⋊B, 2026
 Maintainer  : harley.eades@gmail.com
-
-Framework for creating text templates. These are text with holes that 
-can be filled and plugged. No parsing of the actual text is done, but the 
-text is broken up into `chunk`'s in between the `hole`'s.
-
-Notes for writing docs:
-    - Hole filling parser must escape curly braces and forward slash.
 -}
 {-# LANGUAGE PatternSynonyms              #-}
 {-# LANGUAGE DataKinds                    #-}
@@ -46,26 +39,43 @@ import Data.NatMap                (NatMap
                                   ,singleton)
 import Data.NatMap                qualified as M
 
-type Hole f      = (Natural,HoleProps f)
+-- | Holes are either empty or filled; thus, a hole's properties consists of a
+-- pair of a list of natural numbers designating the set of empty holes and a
+-- natural-number map (t'NatMap') that assigns fillings of type @f@ to hole
+-- indices.
 type HoleProps f = ([Natural],NatMap f)
 
+-- | A hole that can be filled with a filling of type @f@ is a natural number
+-- and a set of hole properties (t`HoleProps`).
+type Hole f      = (Natural,HoleProps f)
+
+-- ** Hole Patterns
+
+-- | Pattern synonym for empty holes. 
 pattern EmptyHole :: Natural -> HoleProps f -> Hole f
 pattern EmptyHole i hlsProps <- (decomposeEmptyHole -> Just (i,hlsProps))
 
+-- | Pattern synonym for filled holes.
 pattern FilledHole :: Natural -> f -> HoleProps f -> Hole f
 pattern FilledHole i f hlsProps <- (decomposeFilledHole -> Just (i,Just f,hlsProps))
 
+-- | Pattern synonym for undefined holes. These are holes which are not currently used
+-- in the template; and thus, are neither free nor empty.
 pattern UndefHole :: Natural -> HoleProps f -> Hole f
 pattern UndefHole i hlsProps <- (decomposeUndefHole -> Just (i,hlsProps))
 
+-- | Determines if the input hole index @i@ is the index of an empty hole.
 decomposeEmptyHole :: (Natural, HoleProps f) -> Maybe (Natural, HoleProps f)
 decomposeEmptyHole h@(i,hlsProps) | emptyHole i hlsProps = Just h
                                   | otherwise = Nothing
 
+-- | Determines if the input hole index @i@ is the index of a filled hole.
 decomposeFilledHole :: Hole f -> Maybe (Natural, Maybe f, HoleProps f)
 decomposeFilledHole (i,hlsProps@(_,fhls)) | filledHole i hlsProps = Just (i,fhls !? i,hlsProps)
                                           | otherwise             = Nothing
 
+-- | Determines if the input hole index @i@ is neither an empty hole or a filled
+-- hole; thus, is undefined in the template.
 decomposeUndefHole :: Hole f -> Maybe (Hole f)
 decomposeUndefHole h | isNothing (decomposeEmptyHole h) && isNothing (decomposeFilledHole h) = Just h
                      | otherwise = Nothing
@@ -78,12 +88,19 @@ isFreshHoleIndex :: Natural     -- ^ Hole index
                  -> Bool
 isFreshHoleIndex h holeProps = not $ filledHole h holeProps || emptyHole h holeProps
 
+-- | Decides if the given hole index is empty with respect to the given hole
+-- properties. This returns `True` when the given index is in the set of
+-- empty holes, but is not defined in the map of filled holes.
 emptyHole :: Natural -> HoleProps f -> Bool
 emptyHole i (hls,fhls) = i `elem` hls && not (i `elem` keys fhls)
 
+-- | Decides if the given hole index is filled with respect to the given hole
+-- properties. This returns `True` when the given index is not in the set of
+-- empty holes, but is defined in the map of filled holes.
 filledHole :: Natural -> HoleProps f -> Bool
 filledHole i (hls,fhls) = not (i `elem` hls) && i `elem` keys fhls
 
+-- | The hole properties with no defined holes.
 emptyHoleProps :: HoleProps f
 emptyHoleProps = ([], M.empty)
 
@@ -99,7 +116,7 @@ updateFreshHolePropsWith holeProps@(hls, fhls) (h, Nothing)  | h `isFreshHoleInd
 updateFreshHolePropsWith holeProps@(hls, fhls) (h, (Just f)) | h `isFreshHoleIndex` holeProps = (hls,insert h f fhls)
 updateFreshHolePropsWith holeProps             (_,_)                                          = holeProps
 
--- | Internal templates are the underlying structure of `Template`.
+-- | Internal templates are the underlying structure of t'Template'.
 data ITemplate text where
     IChunk   :: text -> ITemplate text
     ICompose :: text -> Natural -> ITemplate text -> ITemplate text
@@ -128,6 +145,7 @@ pattern Empty :: (Eq text, Monoid text) => Template text filling
 pattern Empty <- (null -> True) where
     Empty = empty
 
+-- | Decides if a template corresponds to a chunk or not. 
 isChunk :: Template text filling -> Maybe text
 isChunk (Template (IChunk s) ([],m)) | M.null m = Just s
 isChunk _ = Nothing
@@ -177,7 +195,7 @@ null :: (Eq text, Monoid text) => Template text filling -> Bool
 null (Template (IChunk c) ([],m)) | isUnit c && M.null m = True
 null _ = False
 
--- | Equality of `ITemplates`. Hole indices and fillings are not included in the
+-- | Equality of t`ITemplate`. Hole indices and fillings are not included in the
 -- decision.
 (>==>) :: Eq text 
        => ITemplate text 
@@ -224,7 +242,7 @@ empty :: Monoid text
       => Template text filling
 empty = chunk mempty
 
--- | Composition of `ITemplates`.
+-- | Composition of `ITemplate`.
 (>+>) :: Semigroup text
       => ITemplate text 
       -> ITemplate text 
@@ -260,6 +278,7 @@ instance IsString text => IsString (Template text filling) where
     fromString :: String -> Template text filling
     fromString = Chunk . fromString
 
+-- | A type is "text like" if it can be converted into t`Text`.
 class TextLike text where
     toText :: text -> Text
 
@@ -271,7 +290,7 @@ instance TextLike String where
     toText :: String -> Text
     toText = DT.pack
 
--- | Convert a templates AST into a `Text`. The `Show` instance for `Template`
+-- | Convert a templates AST into a `Text`. The `Show` instance for t`Template`
 -- is set to pretty print, but for debugging it is sometimes useful to see the
 -- raw AST.
 showAST :: (TextLike text, TextLike filling) => Template text filling -> Text
@@ -279,13 +298,13 @@ showAST (Template (IChunk x) _)                  = "IChunk "   <> (toText x)
 showAST (Template (ICompose p i r) hls@(_,fhls)) = "ICompose " <> (toText p) <> " " <> (DT.show i) <> " (" <> (DT.show . (fmap toText) $ fhls !? i) <> ") (" <> (showAST (Template r hls)) <> ")"
 
 -- | Get the list of unfilled-hole indices present in a template.
--- Time complexity: @O(0)@
+-- Time complexity: \( \mathcal{O}(0) \)
 unfilledHoles :: Template text filling -- ^ Template 
               -> [Natural]
 unfilledHoles (Template _ (hls,_)) = hls
 
 -- | Get the list of filled-hole indices present in a template.
--- Time complexity: @O(n)@
+-- Time complexity: \( \mathcal{O}(n) \)
 filledHoles :: Template text filling -- ^ Template 
             -> [Natural]
 filledHoles (Template _ (_,fhls)) = keys fhls
@@ -297,13 +316,13 @@ fillingInHole :: Template text filling -- ^ Template
 fillingInHole (Template _ (_,fhls)) h = fhls !? h
 
 -- | Get the number of unfilled holes in a template.
--- Time complexity: @O(n)@
+-- Time complexity: \( \mathcal{O}(n) \)
 numberOfUnfilledHoles :: Template text filling -- ^ Template 
                       -> Int
 numberOfUnfilledHoles (Template _ (hls,_)) = length hls
 
 -- | Get the number of filled holes in a template.
--- Time complexity: @O(n)@
+-- Time complexity: \( \mathcal{O}(n) \)
 numberOfFilledHoles :: Template text filling -- ^ Template 
                     -> Int
 numberOfFilledHoles (Template _ (_,fhls)) = M.size fhls
@@ -314,7 +333,7 @@ isFilled :: Template text filling -> Bool
 isFilled t = numberOfUnfilledHoles t == 0
 
 -- | Convert a template with no holes, a chunk, into a text.
--- Time complexity: @O(0)@
+-- Time complexity: \( \mathcal{O}(0) \)
 chunkToText :: Template text filling 
             -> Maybe text
 chunkToText (Template (IChunk c) ([],fhls)) | M.null fhls = Just c
@@ -333,10 +352,13 @@ placeInHole t@(Template it hlsProps) i c =
 
 -- | Fill a hole with a text. If the hole is already filled, then the filling is
 -- updated with the new value. Filling a hole doesn't replace the hole, but
--- simply puts the input text inside the hole. Returns @Nothing@ if the hole
--- doesn't exist.
+-- simply puts the input @filling@ inside the hole. Returns @Nothing@ if the
+-- hole doesn't exist. The complexity of this operatoin is
+-- \(\mathcal{O}(\max(n_0,\min(n_1,W)))\), where \(n_0\) is the number of empty holes, and
+-- \(n_1\) is the number of filled holes with a max of \(W\) the number of bits
+-- in an `Int` (32 or 64).
 fillHole :: Template text filling
-             -> Natural -- ^ Hole index to plug
+             -> Natural -- ^ Hole index to fill
              -> filling -- ^ Hole filling
              -> Maybe (Template text filling)
 fillHole (Template t hlsProps) i c = 
@@ -409,7 +431,12 @@ plugAll (Template t (hls,fhls)) f | M.null fhls =
         _               -> Nothing
 plugAll _ _ = Nothing
 
--- * Template Expressions
+-- | In the simplest form, a type @filling@ is a hole filling expression if it
+-- can be converted into @text@, because values of type @filling@ will
+-- ultimately plug the hole they are filling. Optionally, a notion of
+-- meta-variable can be declared and a parser from t`Text` into @filling@ can be
+-- declared as well. These make it easier to plug a custom parser in for @text@
+-- making use of the existing parsers for the various instances of t`Template`.
 class (Monoid text,Eq filling) => HoleFillingExp text filling  where    
     hfExpToText :: filling -> text    
     
@@ -419,11 +446,13 @@ class (Monoid text,Eq filling) => HoleFillingExp text filling  where
     parseHFExp :: Maybe (Text -> Either Text filling)
     parseHFExp = Nothing
 
+-- | This class is used to define generic combinators on templates. Simply, this
+-- is the class of types that can be converted into a t`Template`.
 class HoleFillingExp text filling => ToTemplate text filling a where
     toTemplate :: a -> Template text filling
 
 -- | Used to add `HoleFillingExp` constraints to functions that don't take in an
--- explicit `Template`. This is useful for writing generic functions. For an
+-- explicit t`Template`. This is useful for writing generic functions. For an
 -- example, see `Data.TextTemplate.QQInternal.textTemplate2QExp`.
 data Proxy filling r = Proxy {
     runProxy :: r

@@ -5,36 +5,58 @@ Copyright   : (c) Harley Eades, 2026
               (c) W⋊B, 2026
 Maintainer  : harley.eades@gmail.com
 
-This is the combinator library for plain templates which do not specify the
-types of their text or hole filling.
+The base combinator library for templates. 
+
+Write this from the perspective of monoids.
 -}
 module  Data.TextTemplate.Template 
                            (-- * Templates 
                             Template
+                            ,TextLike(..)
+                            ,HoleFillingExp(..)
+                            ,ToTemplate(..)
+                            -- ** Holes                            
+                           ,Hole
+                            -- *** Patterns
+                            -- | Patterns make it easier to decide if a hole is empty, filled, or neither.
+                            -- For example:
+                            --
+                            -- @
+                            -- holeIndex :: Hole f -> Maybe Natural
+                            -- holeIndex (EmptyHole i _)  = Just i
+                            -- holeIndex (FilledHole i _) = Just i
+                            -- holeIndex (UndefHole i _)  = Nothing
+                            -- @
+                            -- Each pattern uses the hole's properties
+                            -- ('HoleProps') to decide if the hole's index is in
+                            -- the required is location within the hole
+                            -- properties, if not then it's considered
+                            -- undefined. This prevents a lot of boilerplate
+                            -- pattern matching.
                            ,pattern Empty
                            ,pattern Chunk
-                           ,pattern Compose
-                           ,Hole
+                           ,pattern Compose                           
                             -- ** Template Combinators
                            ,hole
                            ,filled
                            ,chunk
-                           ,(+>)
-                           ,showAST
-                           ,sepTemplatesBy 
-                           ,betweenTemplate
-                           -- ** Template Properties
+                           ,(+>)                                                      
+                           -- *** Plugging Holes in Templates
+                           ,plugHole
+                           ,plugAll
+                           ,fillHole
+                           ,placeInHole
+                           -- *** Template Hole Properties
                            ,unfilledHoles
                            ,filledHoles
                            ,numberOfUnfilledHoles
-                           ,numberOfFilledHoles                        
-                           -- ** Plugging Holes in Templates
-                           ,plugHole
-                           ,plugAll
-                           -- ** Equality and Matching
+                           ,numberOfFilledHoles
+                           -- *** Equality
                            ,(==>)
-                           -- ** Converting from Templates
-                           ,chunkToText                           
-                           ) where
+                           -- *** Useful Helpers
+                           ,showAST
+                           ,sepTemplatesBy 
+                           ,betweenTemplate
+                           ,chunkToText) where
 
 import Data.TextTemplate.TemplateInternal

@@ -62,7 +62,7 @@ intTemplate = QuasiQuoter {
    ,quoteType = undefined
 }
 
---- | Parses a string into `Template Text` and then into a Template Haskell expression.
+-- | Parses a string into `Template Text` and then into a Template Haskell expression.
 textTemplate2QExp :: HoleFillingExp Text filling
                   => Proxy filling Text    -- ^ String to parse as a textTemplate
                   -> Q Exp

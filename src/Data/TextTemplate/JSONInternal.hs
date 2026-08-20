@@ -83,8 +83,6 @@ import Control.Monad.State                (State
 import Data.Maybe                         (isNothing)
 import Data.String                        (IsString (..))
 
--- * Templates + Filling Expressions
-
 -- | A intermediate expression language for text templates where expressions
 -- (`FillingExp`) fill their holes.
 type TemplateExp = Template Text FillingExp
@@ -163,7 +161,7 @@ object :: [Field] -- ^ List of fields of the object
        -> TemplateExp
 object fields = StrT.betweenTemplate (chunk "{") (chunk "}") $ StrT.sepTemplatesBy @Text @FillingExp (chunk ",") fields
 
---- | Create a template of a field of an object.
+-- | Create a template of a field of an object.
 field :: Field -- ^ Field of the object
       -> TemplateExp
 field (label,value) = fieldLabel label +> toTemplate value
@@ -238,6 +236,7 @@ parseTest p s = do
         print 
     $ parse p s
 
+-- | Run the input parser against a file. This is useful for testing.
 parseTestFile :: Show a => JSONParser a -> FilePath -> IO ()
 parseTestFile p file = do
     f <- readFile file
@@ -247,10 +246,12 @@ parseTestFile p file = do
 varFexp :: String -> FillingExp
 varFexp = VarFilling
 
+-- | Convert `FillingExp` into its AST as a `Text`.
 showASTFilling :: FillingExp -> Text
 showASTFilling (LitFilling s) = "LitFilling "<>DT.show s
 showASTFilling (VarFilling v) = "VarFilling "<>DT.show v
 
+-- | Parses meta-variable that can fill holes.
 parseVarFilling :: Text -> Either Text String
 parseVarFilling s 
     = case parse varFillingParser s of
@@ -258,6 +259,7 @@ parseVarFilling s
         Right (VarFilling t) -> Right t
         _ -> error "TextTemplates.Parser: impossible branch reached in parseVarFilling."
 
+-- | Parses a literal hole filling.
 parseLitFilling :: Text -> Either Text Text
 parseLitFilling s 
     = case parse litFillingParser s of
@@ -265,27 +267,31 @@ parseLitFilling s
         Right (LitFilling t) -> Right t
         _ -> error "TextTemplates.Parser: impossible branch reached in parseLitFilling."
 
+-- | Parses a hole filling: either a meta-variable or a literal filling.
 parseFillingExp :: Text -> Either Text FillingExp
 parseFillingExp s 
     = case parse fillingExpParser s of
         Left bundle -> Left . DT.pack $ errorBundlePretty bundle
         Right t -> Right t
 
+-- | Parses a single character of some hole filling where @"@ and @\\@ are escaped.
 charFillingParser :: JSONParser Char
 charFillingParser = choice [
         satisfy (\c -> c /= '"' && c /= '\\'),
         escapeCharFillingParser
     ]
 
+-- | Parses an escape filling character.
 escapeCharFillingParser :: JSONParser Char
 escapeCharFillingParser = do
     skip (string "\\")
     satisfy (`elem` ['"','\\'])
 
+-- | Parses zero or more filling characters.
 stringFillingParser :: JSONParser Text
 stringFillingParser = DT.pack <$> many charFillingParser
 
-
+-- | Parser for meta-variable hole fillings.
 varFillingParser :: JSONParser FillingExp
 varFillingParser = VarFilling <$> do
     -- Make sure we start with a lower-case ascii letter.
@@ -294,9 +300,11 @@ varFillingParser = VarFilling <$> do
     then customFailure JTPEInvalidVarName
     else DT.unpack <$> takeWhile1P Nothing (\c -> isAlphaNum c && isAscii c)
 
+-- | Parser for literal hole filling.
 litFillingParser :: JSONParser FillingExp
 litFillingParser = LitFilling <$> doubleQuotedParser stringFillingParser
 
+-- | Parser for hole filling: either a meta-variable or a literal.
 fillingExpParser :: JSONParser FillingExp
 fillingExpParser =  litFillingParser
                 <|> varFillingParser
@@ -310,6 +318,7 @@ parseJSONTemplate (DT.stripStart->s)
         Left bundle -> error $ errorBundlePretty bundle
         Right s -> Right s
 
+-- | Parser for JSON. Requires the input to end of `eof`.
 jsonParser :: JSONParser Value
 jsonParser = do
     space
@@ -413,6 +422,8 @@ arrayVParser = do
     pure $ ArrayV ary
 
 -- * JSONParser combinators
+
+-- | Parser for JSON templates.
 templateParser :: JSONParser TemplateExp
 templateParser = do
     s <- singleQuotedParser charsParser
@@ -438,13 +449,14 @@ bracketsParser = between (tok "[") (tok "]")
 
 -- | Parse an escape character. 
 -- These are one of
--- @['\\','/','"','\'','b','n','f','r','t']@
+-- > ["\\","/",""","\'","b","n","f","r","t"]
 escapeParser :: JSONParser Char
 escapeParser = do
     skip backslashTok
     escapeCharParser
         <|> unicodeEscapeParser
 
+-- | Parse an escape character without the proceeding `"\\"`.
 escapeCharParser :: JSONParser Char
 escapeCharParser = do
     e <- satisfy isEscapeChar
@@ -456,6 +468,7 @@ escapeCharParser = do
 isEscapeChar :: Char -> Bool
 isEscapeChar = (`elem` ['/','\\','"','\'','b','n','f','r','t'])
 
+-- | Properly escapes the input character based on the JSON standard.
 escapeToChar :: Char -> Maybe Char
 escapeToChar 'b' = Just '\b'
 escapeToChar 'n' = Just '\n'
