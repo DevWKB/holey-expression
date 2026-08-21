@@ -439,12 +439,23 @@ plugAll _ _ = Nothing
 -- making use of the existing parsers for the various instances of t`Template`.
 class (Monoid text,Eq filling) => HoleFillingExp text filling  where    
     hfExpToText :: filling -> text    
-    
-    varHFExp :: filling -> Maybe text
-    varHFExp = const Nothing
 
     parseHFExp :: Maybe (Text -> Either Text filling)
-    parseHFExp = Nothing
+    parseHFExp = Nothing    
+
+instance HoleFillingExp Text String where
+    hfExpToText :: String -> Text
+    hfExpToText = DT.pack
+
+    parseHFExp :: Maybe(Text -> Either Text String)
+    parseHFExp = Just $ Right . DT.unpack
+
+instance HoleFillingExp String Text where
+    hfExpToText :: Text -> String
+    hfExpToText = DT.unpack
+
+    parseHFExp :: Maybe(Text -> Either Text Text)
+    parseHFExp = Just $ Right
 
 -- | This class is used to define generic combinators on templates. Simply, this
 -- is the class of types that can be converted into a t`Template`.

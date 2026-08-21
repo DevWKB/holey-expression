@@ -66,7 +66,7 @@ import Data.TextTemplate.TemplateInternal ((+>)
                                           ,chunk
                                           ,Template
                                           ,ToTemplate (..)
-                                          ,HoleFillingExp) 
+                                          ,HoleFillingExp, Proxy (runProxy)) 
 import Data.TextTemplate.TemplateInternal qualified as StrT
 import Data.TextTemplate.Text             qualified as StrT
 import Data.TextTemplate.QQInternal       qualified as StrT
@@ -98,10 +98,6 @@ data FillingExp
     | LitFilling Text    -- ^ Literal filling
 
 instance HoleFillingExp Text FillingExp where
-    varHFExp :: FillingExp -> Maybe Text
-    varHFExp (VarFilling v) = Just . DT.pack $ v
-    varHFExp _              = Nothing
-    
     hfExpToText :: FillingExp -> Text
     hfExpToText (VarFilling v) = DT.pack v
     hfExpToText (LitFilling t) = t
@@ -186,6 +182,13 @@ jsonTemplate = TH.QuasiQuoter {
     ,quoteDec = undefined
     ,quoteType = undefined
 }
+
+instance StrT.ToQExp FillingExp where
+    toQExp :: FillingExp -> TH.Q TH.Exp
+    toQExp (VarFilling v) = TH.varE (TH.mkName v)
+    toQExp (LitFilling l) = TH.litE (TH.StringL . DT.unpack $ l)
+    
+instance StrT.TemplateQExp Text FillingExp where
 
 -- | Parse and convert a string into a JSON template. First parses the input
 -- string into the internal language of JSON values, and then converts the

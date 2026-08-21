@@ -7,48 +7,42 @@ Maintainer  : harley.eades@gmail.me
 
 Templates are essentially monoids with two types of elements "chunks of text"
 and "holes". Then when all holes are plugged in a template it corresponds to a
-piece of text.
+piece of text; here we are using @text@ abstractly, and in fact, the base
+definition of `Template`'s is abstract in both the type of text as well as the
+type of values you can fill holes with.
 
-A simple example using `Data.Text`:
+A simple example:
 
-> ghci> let t = (chunk "Today's Temperature: ") +> (hole 1) +> (chunk " high/") +> (hole 2) +> (chunk " low") :: Template Text Double
+>>> let t = (chunk "Today's Temperature: ") +> (hole 1) +> (chunk " high/") +> (hole 2) +> (chunk " low") :: Template Text Double
+>>> t
+Today's Temperature: $1{} high/$2{} low
 
-Then if we plug the two holes in @t@ we obtain:
-
-> ghci> plugAll t $ \_ -> \i -> if i == 1 then Just 91.2 else if i == 2 then Just 87.0 else Nothing
-> Just "Today's Temperature: 91.2 high/87.0 low"
+>>> plugAll t $ \_ -> \i -> if i == 1 then Just 91.2 else if i == 2 then Just 87.0 else Nothing 
+Just "Today's Temperature: 91.2 high/87.0 low"
 
 The above is an example of a Text template of type @Template Text Double@ where
 the first type is the type we are ultimately constructing a value of when all
 holes are plugged, and the second type is the type of the filling we place in
 the holes.
 
-We can think of @t@ as the following:
+A second way we can write the same template using @OverloadedStrings@ is:
 
-> Today's Temperature: $1{} high/$2{} low
+>>> let t'' = "Today's Temperature: " <> (hole 1) <> " high/" <> (hole 2) <> " low" :: Template Text Double
+>>> t ==> t''
+True
 
-In fact, using the quasi-quoters defined in `Data.TextTemplate.TextTemplateQQ` we can write it
-this way:
-
-> ghci> let t' = [textTemplate|Today\'s Temperature: $1{} high/$2{} low|] :: Template Text Double
-> ghci> t ==> t'
-> True
-
-A third way we can write the same template using @OverloadedStrings@ is:
-
-> ghci> let t'' = "Today's Temperature: " <> (hole 1) <> " high/" <> (hole 2) <> " low" :: Template Text Double
-> ghci> t ==> t''
-> True
-
+There is a third way as well, but it requires Template Haskell; see
+"Data.TextTemplate.TextTemplateQQ".
 -}
-{-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE PatternSynonyms       #-}
+{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# OPTIONS_GHC -Wno-orphans       #-}
 module Data.TextTemplate  (-- * Templates
-                           module Data.TextTemplate.Template
+                           Data.Text.Text
+                          ,module Data.TextTemplate.Template
                            -- * Text Templates
                           ,bracketTemplate
                           ,braceTemplate
@@ -64,17 +58,37 @@ module Data.TextTemplate  (-- * Templates
                           ,runParsecT) where
 
 import Data.TextTemplate.Template 
-import Text.Megaparsec (ShowErrorComponent (..), ParseErrorBundle, ParsecT, Parsec, MonadParsec (..), parse, errorBundlePretty, runParserT, many, choice, satisfy, customFailure, some, (<|>), atEnd, skipCount, between)
-import Data.Text (Text)
-import Data.Void (Void)
-import Data.NatMap (Natural)
-import Data.String (IsString (..))
-import qualified Data.Text as DT
-import Text.Megaparsec.Char (string,digitChar, char, space)
-import Data.Char (isAsciiLower, isAlphaNum, isAscii)
-import Data.Maybe (isNothing)
-import qualified Data.List as L
-import Text.Megaparsec.Byte.Lexer (symbol)
+import Text.Megaparsec             (ShowErrorComponent (..)
+                                   ,ParseErrorBundle
+                                   ,ParsecT
+                                   ,Parsec
+                                   ,MonadParsec (..)
+                                   ,parse
+                                   ,errorBundlePretty
+                                   ,runParserT
+                                   ,many
+                                   ,choice
+                                   ,satisfy
+                                   ,customFailure
+                                   ,some
+                                   ,(<|>)
+                                   ,atEnd
+                                   ,skipCount
+                                   ,between)
+import Data.Text                   (Text)
+import Data.Void                   (Void)
+import Data.NatMap                 (Natural)
+import Data.String                 (IsString (..))
+import Data.Text                   qualified as DT
+import Text.Megaparsec.Char        (string,digitChar
+                                   ,char
+                                   ,space)
+import Data.Char                   (isAsciiLower
+                                   ,isAlphaNum
+                                   ,isAscii)
+import Data.Maybe                  (isNothing)
+import Data.List                   qualified as L
+import Text.Megaparsec.Byte.Lexer  (symbol)
 
 -- | Type of tokens.
 type Tok = Text
@@ -132,7 +146,16 @@ instance TextLike Double where
 
 instance HoleFillingExp Text Double where
     hfExpToText :: Double -> Text
-    hfExpToText = DT.show
+    hfExpToText = toText
+
+    parseHFExp :: Maybe (Text -> Either Text Double)
+    parseHFExp = Just . runParsec @Void $ p
+        where
+            p :: Parsec Void Text Double
+            p = do d1 <- many digitChar 
+                   c <- string "." >>= pure . DT.unpack
+                   d2 <- many digitChar 
+                   pure . read $ d1 <> c <> d2
 
 -- | Parses a variable as a string. Variables must begin with a lower-case ascii
 -- letter, and then contain ascii alpha-numeric characters.
