@@ -1,5 +1,5 @@
 cabal-version:  2.4
-name:           text-templates
+name:           holey-expression
 version:        0.1.0.0
 license:        BSD-3-Clause
 license-file:   LICENSE.md
@@ -7,15 +7,15 @@ maintainer:     Harley Eades III <harley.eades@gmail.com>
 author:         Harley Eades III
 
 tested-with: 
-    ghc ==9.10.3
+    ghc == 9.10.3
 
-homepage:       https://github.com/heades/text-templates
-bug-reports:    https://github.com/heades/text-templates/issues
-synopsis:       Add, fill, plug holes in text
+homepage:       https://github.com/DevWKB/holey-expression
+bug-reports:    https://github.com/DevWKB/holey-expression/issues
+synopsis:       Add, fill, plug holes in monoids
 description:    
-    In its simplest form, this is a text interpolation library, but
-    with the ability to allow a custom language to fill or plug the  
-    placeholders we call "holes".
+    In its simplest form, this is a library that allows you to add 
+    placeholders we call "holes" to any monoid. Then these holes 
+    can be filled or plugged.
 
 category:       Text
 build-type:     Simple
@@ -26,7 +26,7 @@ extra-doc-files:
 
 source-repository head
   type: git
-  location: https://github.com/heades/text-templates
+  location: https://github.com/heades/holey-expression
 
 common depends
     build-depends:
@@ -51,19 +51,14 @@ common test-depends
 library
   import: depends
   exposed-modules:
-      Data.TextTemplate
-      Data.TextTemplate.Template
-      Data.TextTemplate.TemplateInternal
-      Data.TextTemplate.TextTemplateQQ
-      Data.TextTemplate.QQInternal
-      Data.TextTemplate.Text
-      Data.TextTemplate.JSON
-      Data.TextTemplate.JSONInternal
+      Data.HoleyExp.HExp
+      Data.HoleyExp.HExpInternal
+      Data.HoleyExp.Text
       Data.NatMap
   other-modules:
-      Paths_text_templates      
+      Paths_holey_expression      
   autogen-modules:
-      Paths_text_templates
+      Paths_holey_expression
   hs-source-dirs:
       src
   ghc-options: -Wall 
@@ -86,19 +81,17 @@ library
     GADTs
   default-language: Haskell2010
 
-test-suite text-templates-test
+test-suite holey-expression-test
   import: depends, test-depends
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      Paths_text_templates
-      Data.TextTemplate.TemplateInternalSpec
-      Data.TextTemplate.QQInternalSpec      
-      Data.TextTemplate.JSONInternalSpec
-      Test.QuickCheck.Template
+      Paths_holey_expression
+      Data.HoleyExp.HExpInternalSpec
+      Test.QuickCheck.HExp
       Test.Helpers
   autogen-modules:
-      Paths_text_templates
+      Paths_holey_expression
   hs-source-dirs:
       test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
@@ -110,5 +103,5 @@ test-suite text-templates-test
     ViewPatterns
     GADTs
   build-depends:     
-    ,text-templates    
+    ,holey-expression    
   default-language: Haskell2010

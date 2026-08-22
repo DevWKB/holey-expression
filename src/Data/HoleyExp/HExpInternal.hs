@@ -1,6 +1,6 @@
 {-|
-Module      : TemplateInternal
-Description : Internal framework for creating templates
+Module      : HExpInternal
+Description : Internal framework for creating holey expressions
 Copyright   : (c) Harley Eades, 2026
               (c) W⋊B, 2026
 Maintainer  : harley.eades@gmail.com
@@ -21,7 +21,7 @@ Maintainer  : harley.eades@gmail.com
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 {-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE FlexibleContexts #-}
-module Data.TextTemplate.TemplateInternal where
+module Data.HoleyExp.HExpInternal where
 
 import Prelude                    hiding (null)
 import Data.Text                  (Text)
@@ -60,7 +60,7 @@ pattern FilledHole :: Natural -> f -> HoleProps f -> Hole f
 pattern FilledHole i f hlsProps <- (decomposeFilledHole -> Just (i,Just f,hlsProps))
 
 -- | Pattern synonym for undefined holes. These are holes which are not currently used
--- in the template; and thus, are neither free nor empty.
+-- in the expression; and thus, are neither free nor empty.
 pattern UndefHole :: Natural -> HoleProps f -> Hole f
 pattern UndefHole i hlsProps <- (decomposeUndefHole -> Just (i,hlsProps))
 
@@ -75,7 +75,7 @@ decomposeFilledHole (i,hlsProps@(_,fhls)) | filledHole i hlsProps = Just (i,fhls
                                           | otherwise             = Nothing
 
 -- | Determines if the input hole index @i@ is neither an empty hole or a filled
--- hole; thus, is undefined in the template.
+-- hole; thus, is undefined in the expression.
 decomposeUndefHole :: Hole f -> Maybe (Hole f)
 decomposeUndefHole h | isNothing (decomposeEmptyHole h) && isNothing (decomposeFilledHole h) = Just h
                      | otherwise = Nothing
@@ -116,70 +116,70 @@ updateFreshHolePropsWith holeProps@(hls, fhls) (h, Nothing)  | h `isFreshHoleInd
 updateFreshHolePropsWith holeProps@(hls, fhls) (h, (Just f)) | h `isFreshHoleIndex` holeProps = (hls,insert h f fhls)
 updateFreshHolePropsWith holeProps             (_,_)                                          = holeProps
 
--- | Internal templates are the underlying structure of t'Template'.
-data ITemplate text where
-    IChunk   :: text -> ITemplate text
-    ICompose :: text -> Natural -> ITemplate text -> ITemplate text
+-- | The underlying structure of t'HExp'.
+data IHExp text where
+    IChunk   :: text -> IHExp text
+    ICompose :: text -> Natural -> IHExp text -> IHExp text
 
--- | A template with pluggable holes. We do not expose the underlying
+-- | An expression with pluggable holes. We do not expose the underlying
 -- constructor in favor of the combinators.
-data Template text filling where
-    Template :: ITemplate text        -- ^ Internal template
-             -> HoleProps filling     -- ^ Empty holes and hole-filling map
-             -> Template text filling
+data HExp text filling where
+    HExp :: IHExp text        -- ^ Internal expression
+         -> HoleProps filling -- ^ Empty holes and hole-filling map
+         -> HExp text filling
 
-instance (TextLike text, HoleFillingExp text filling) => Show (Template text filling) where
-    show :: Template text filling -> String    
-    show (Template (IChunk t) _) = DT.unpack . toText $ t    
-    show (Template (ICompose prefix i rest) (emptyHoles, filledHoles))
+instance (TextLike text, HoleFillingExp text filling) => Show (HExp text filling) where
+    show :: HExp text filling -> String    
+    show (HExp (IChunk t) _) = DT.unpack . toText $ t    
+    show (HExp (ICompose prefix i rest) (emptyHoles, filledHoles))
         = (DT.unpack . toText $ prefix) 
         <> "$" <> show i <> "{"
         <> (if i `elem` emptyHoles then "" else (DT.unpack . toText . (hfExpToText @text) $ filledHoles ! i))
         <> "}" 
-        <> show (Template rest (emptyHoles, filledHoles))
+        <> show (HExp rest (emptyHoles, filledHoles))
 
 -- * Combinators
 
--- | Pattern synonym for the empty template.
-pattern Empty :: (Eq text, Monoid text) => Template text filling
+-- | Pattern synonym for the empty expression.
+pattern Empty :: (Eq text, Monoid text) => HExp text filling
 pattern Empty <- (null -> True) where
     Empty = empty
 
--- | Decides if a template corresponds to a chunk or not. 
-isChunk :: Template text filling -> Maybe text
-isChunk (Template (IChunk s) ([],m)) | M.null m = Just s
+-- | Decides if an expression corresponds to a chunk or not. 
+isChunk :: HExp text filling -> Maybe text
+isChunk (HExp (IChunk s) ([],m)) | M.null m = Just s
 isChunk _ = Nothing
 
--- | Pattern synonym for template chunk's.
-pattern Chunk :: text -> Template text filling
+-- | Pattern synonym for expression chunk's.
+pattern Chunk :: text -> HExp text filling
 pattern Chunk s <- (isChunk -> Just s)
     where
         Chunk = chunk
 
--- | Pattern synonym for the composition of templates.
-pattern Compose :: Monoid text => text -> (Natural,Maybe filling) -> Template text filling -> Template text filling
+-- | Pattern synonym for the composition of holey expressions.
+pattern Compose :: Monoid text => text -> (Natural,Maybe filling) -> HExp text filling -> HExp text filling
 pattern Compose c h t <- (decompose -> Just (c, h, t))
     where
         Compose = compose
 
 {-# COMPLETE Chunk, Compose #-}
 
--- | Explicitly create a top-level composition template.
+-- | Explicitly create a top-level composition expression.
 compose :: Monoid text
         => text                   -- ^ Prefix chunk
         -> (Natural,Maybe filling)           
-        -> Template text filling  -- ^ Template branch
-        -> Template text filling
+        -> HExp text filling  -- ^ HExp branch
+        -> HExp text filling
 compose c (i, Nothing) t = chunk c +> hole i     +> t
 compose c (i, Just f)  t = chunk c +> filled i f +> t
 
--- | Decompose a template into the top-level compose.
-decompose :: Template text filling 
-          -> Maybe (text, (Natural,Maybe filling), Template text filling)
-decompose (Template (ICompose c i t') hlsProps) =     
+-- | Decompose an expression into the top-level compose.
+decompose :: HExp text filling 
+          -> Maybe (text, (Natural,Maybe filling), HExp text filling)
+decompose (HExp (ICompose c i t') hlsProps) =     
      case (i,hlsProps) of
-        (EmptyHole _ (uh,fh))    -> Just (c, (i,Nothing), Template t' (i `L.delete` uh,fh))
-        (FilledHole _ f (uh,fh)) -> Just (c, (i,Just f),  Template t' (uh,i `delete` fh))
+        (EmptyHole _ (uh,fh))    -> Just (c, (i,Nothing), HExp t' (i `L.delete` uh,fh))
+        (FilledHole _ f (uh,fh)) -> Just (c, (i,Just f),  HExp t' (uh,i `delete` fh))
         (UndefHole  _ _)         -> Nothing
 decompose _ = Nothing
 
@@ -190,92 +190,92 @@ isUnit :: (Eq m, Monoid m)
 isUnit m | m == mempty = True
          | otherwise   = False
 
--- | Test to see if a template is empty.
-null :: (Eq text, Monoid text) => Template text filling -> Bool
-null (Template (IChunk c) ([],m)) | isUnit c && M.null m = True
+-- | Test to see if an expression is empty.
+null :: (Eq text, Monoid text) => HExp text filling -> Bool
+null (HExp (IChunk c) ([],m)) | isUnit c && M.null m = True
 null _ = False
 
--- | Equality of t`ITemplate`. Hole indices and fillings are not included in the
--- decision.
+-- | Equality of t`IHExp`. Holes are ignored.
 (>==>) :: Eq text 
-       => ITemplate text 
-       -> ITemplate text
+       => IHExp text 
+       -> IHExp text
        -> Bool
 (IChunk chk1)        >==> (IChunk chk2)        = chk1 == chk2
 (ICompose chk1 _ r1) >==> (ICompose chk2 _ r2) = chk1 == chk2 && r1 >==> r2
 _                    >==> _                    = False
 
-instance (Eq text, Eq filling) => Eq (Template text filling) where
-    (==) :: Template text filling -> Template text filling -> Bool
+instance (Eq text, Eq filling) => Eq (HExp text filling) where
+    (==) :: HExp text filling -> HExp text filling -> Bool
     (==) = (==>)
 
--- | Equality of templates. Two templates are considered equivalent if and only
+-- | Equality of holey expressions. Two holey expressions are considered equivalent if and only
 -- if they differ by hole labels only. The contents of filled holes are included
 -- in the decision.
 (==>) :: (Eq text,Eq filling)
-      => Template text filling
-      -> Template text filling
+      => HExp text filling
+      -> HExp text filling
       -> Bool
-(Template t1 (hls1,fhls1)) ==> (Template t2 (hls2,fhls2)) = t1 >==> t2 && hls1 == hls2 && fhls1 == fhls2
+(HExp t1 (hls1,fhls1)) ==> (HExp t2 (hls2,fhls2)) = t1 >==> t2 && hls1 == hls2 && fhls1 == fhls2
 
 -- | An empty hole.
 hole :: Monoid text
      => Natural -- ^ Hole index
-     -> Template text filling
-hole i = flip Template ([i],M.empty) $ ICompose mempty i (IChunk mempty)
+     -> HExp text filling
+hole i = flip HExp ([i],M.empty) $ ICompose mempty i (IChunk mempty)
 
--- | A hole filled with a value. 
+-- | A hole with a filling. 
 filled :: Monoid text
        => Natural -- ^ Hole index
        -> filling -- ^ Hole filling
-       -> Template text filling
+       -> HExp text filling
 filled i f 
-    = flip Template ([],singleton i f) $ (ICompose mempty i (IChunk mempty))
+    = flip HExp ([],singleton i f) $ (ICompose mempty i (IChunk mempty))
 
--- | A chunk is a substring to a larger string.
-chunk :: text -- ^ Substring.
-      -> Template text filling
-chunk = flip Template ([],M.empty) .  IChunk
+-- | A chunk is a constant; it's helpful to think of these as a piece of
+-- subtext. 
+chunk :: text -- ^ Constant
+      -> HExp text filling
+chunk = flip HExp ([],M.empty) .  IChunk
 
--- | The empty template corresponds to the empty string.
+-- | The empty expression.
 empty :: Monoid text 
-      => Template text filling
+      => HExp text filling
 empty = chunk mempty
 
--- | Composition of `ITemplate`.
+-- | Composition of `IHExp`.
 (>+>) :: Semigroup text
-      => ITemplate text 
-      -> ITemplate text 
-      -> ITemplate text 
+      => IHExp text 
+      -> IHExp text 
+      -> IHExp text 
 (IChunk chk1)    >+> (IChunk chk2)    = IChunk $ chk1 <> chk2
 (IChunk chk)     >+> (ICompose p h r) = ICompose (chk <> p) h r
 (ICompose p h r) >+> t                = ICompose p h $ r >+> t
 
--- | Composition of templates.
+-- | Composition of holey expressions.
 (+>) :: Semigroup text 
-     => Template text filling
-     -> Template text filling
-     -> Template text filling
-(Template t1 (ufhs1,fhs1)) +> (Template t2 (ufhs2,fhs2)) 
-    = Template (t1 >+> t2) (ufhs1 `L.union` ufhs2,fhs1 `M.union` fhs2) 
+     => HExp text filling
+     -> HExp text filling
+     -> HExp text filling
+(HExp t1 (ufhs1,fhs1)) +> (HExp t2 (ufhs2,fhs2)) 
+    = HExp (t1 >+> t2) (ufhs1 `L.union` ufhs2,fhs1 `M.union` fhs2) 
 
-instance Semigroup text => Semigroup (Template text filling) where
-    (<>) :: Template text filling -> Template text filling -> Template text filling
+instance Semigroup text => Semigroup (HExp text filling) where
+    (<>) :: HExp text filling -> HExp text filling -> HExp text filling
     (<>) = (+>)
 
-instance Monoid text => Monoid (Template text filling) where
-    mempty :: Template text filling
+instance Monoid text => Monoid (HExp text filling) where
+    mempty :: HExp text filling
     mempty = empty
 
-    mconcat :: [Template text filling] -> Template text filling
+    mconcat :: [HExp text filling] -> HExp text filling
     mconcat = foldr (<>) empty
 
-instance Functor (Template text) where
-    fmap :: (filling1 -> filling2) -> Template text filling1 -> Template text filling2
-    fmap f (Template t (hls,fhls)) = Template t $ (hls,M.map f fhls)
+instance Functor (HExp text) where
+    fmap :: (filling1 -> filling2) -> HExp text filling1 -> HExp text filling2
+    fmap f (HExp t (hls,fhls)) = HExp t $ (hls,M.map f fhls)
 
-instance IsString text => IsString (Template text filling) where
-    fromString :: String -> Template text filling
+instance IsString text => IsString (HExp text filling) where
+    fromString :: String -> HExp text filling
     fromString = Chunk . fromString
 
 -- | A type is "text like" if it can be converted into t`Text`.
@@ -290,94 +290,94 @@ instance TextLike String where
     toText :: String -> Text
     toText = DT.pack
 
--- | Convert a templates AST into a `Text`. The `Show` instance for t`Template`
--- is set to pretty print, but for debugging it is sometimes useful to see the
--- raw AST.
-showAST :: (TextLike text, TextLike filling) => Template text filling -> Text
-showAST (Template (IChunk x) _)                  = "IChunk "   <> (toText x)
-showAST (Template (ICompose p i r) hls@(_,fhls)) = "ICompose " <> (toText p) <> " " <> (DT.show i) <> " (" <> (DT.show . (fmap toText) $ fhls !? i) <> ") (" <> (showAST (Template r hls)) <> ")"
+-- | Convert a holey expression's AST into a `Text`. The `Show` instance for
+-- t`HExp` is set to pretty print, but for debugging it is sometimes useful to
+-- see the raw AST.
+showAST :: (TextLike text, TextLike filling) => HExp text filling -> Text
+showAST (HExp (IChunk x) _)                  = "IChunk "   <> (toText x)
+showAST (HExp (ICompose p i r) hls@(_,fhls)) = "ICompose " <> (toText p) <> " " <> (DT.show i) <> " (" <> (DT.show . (fmap toText) $ fhls !? i) <> ") (" <> (showAST (HExp r hls)) <> ")"
 
--- | Get the list of unfilled-hole indices present in a template.
+-- | Get the list of unfilled-hole indices present in an expression.
 -- Time complexity: \( \mathcal{O}(0) \)
-unfilledHoles :: Template text filling -- ^ Template 
+unfilledHoles :: HExp text filling -- ^ HExp 
               -> [Natural]
-unfilledHoles (Template _ (hls,_)) = hls
+unfilledHoles (HExp _ (hls,_)) = hls
 
--- | Get the list of filled-hole indices present in a template.
+-- | Get the list of filled-hole indices present in an expression.
 -- Time complexity: \( \mathcal{O}(n) \)
-filledHoles :: Template text filling -- ^ Template 
+filledHoles :: HExp text filling -- ^ HExp 
             -> [Natural]
-filledHoles (Template _ (_,fhls)) = keys fhls
+filledHoles (HExp _ (_,fhls)) = keys fhls
 
 -- | Get the filling of a hole. Returns @Nothing@ when the hole doesn't exist.
-fillingInHole :: Template text filling -- ^ Template
-              -> Natural               -- ^ Hole index
+fillingInHole :: HExp text filling -- ^ HExp
+              -> Natural           -- ^ Hole index
               -> Maybe filling
-fillingInHole (Template _ (_,fhls)) h = fhls !? h
+fillingInHole (HExp _ (_,fhls)) h = fhls !? h
 
--- | Get the number of unfilled holes in a template.
+-- | Get the number of unfilled holes in an expression.
 -- Time complexity: \( \mathcal{O}(n) \)
-numberOfUnfilledHoles :: Template text filling -- ^ Template 
+numberOfUnfilledHoles :: HExp text filling -- ^ HExp 
                       -> Int
-numberOfUnfilledHoles (Template _ (hls,_)) = length hls
+numberOfUnfilledHoles (HExp _ (hls,_)) = length hls
 
--- | Get the number of filled holes in a template.
+-- | Get the number of filled holes in an expression.
 -- Time complexity: \( \mathcal{O}(n) \)
-numberOfFilledHoles :: Template text filling -- ^ Template 
+numberOfFilledHoles :: HExp text filling -- ^ HExp 
                     -> Int
-numberOfFilledHoles (Template _ (_,fhls)) = M.size fhls
+numberOfFilledHoles (HExp _ (_,fhls)) = M.size fhls
 
--- | Decide if a template is filled or not. 
+-- | Decide if an expression is filled or not. 
 -- Time complexity: \(\mathcal{O}(n)\)
-isFilled :: Template text filling -> Bool
+isFilled :: HExp text filling -> Bool
 isFilled t = numberOfUnfilledHoles t == 0
 
--- | Convert a template with no holes, a chunk, into a text.
+-- | Convert an expression with no holes, a chunk, into a text.
 -- Time complexity: \( \mathcal{O}(0) \)
-chunkToText :: Template text filling 
+chunkToText :: HExp text filling 
             -> Maybe text
-chunkToText (Template (IChunk c) ([],fhls)) | M.null fhls = Just c
-chunkToText _                                             = Nothing
+chunkToText (HExp (IChunk c) ([],fhls)) | M.null fhls = Just c
+chunkToText _                                         = Nothing
 
 -- | Like `fillHole`, but doesn't update an already filled hole's value.
-placeInHole :: Template text filling
+placeInHole :: HExp text filling
             -> Natural -- ^ Hole index to plug
             -> filling -- ^ Hole filling
-            -> Maybe (Template text filling)
-placeInHole t@(Template it hlsProps) i c =
+            -> Maybe (HExp text filling)
+placeInHole t@(HExp it hlsProps) i c =
     case (i,hlsProps) of
-        EmptyHole  _   (hls,fhls) -> Just $ Template it $ (i `L.delete` hls,insert i c fhls)
+        EmptyHole  _   (hls,fhls) -> Just $ HExp it $ (i `L.delete` hls,insert i c fhls)
         FilledHole _ _ _          -> Just $ t
         UndefHole  _   _          -> Nothing
 
--- | Fill a hole with a text. If the hole is already filled, then the filling is
+-- | Fill a hole with a filling. If the hole is already filled, then the filling is
 -- updated with the new value. Filling a hole doesn't replace the hole, but
 -- simply puts the input @filling@ inside the hole. Returns @Nothing@ if the
--- hole doesn't exist. The complexity of this operatoin is
+-- hole doesn't exist. The complexity of this operation is
 -- \(\mathcal{O}(\max(n_0,\min(n_1,W)))\), where \(n_0\) is the number of empty holes, and
 -- \(n_1\) is the number of filled holes with a max of \(W\) the number of bits
 -- in an `Int` (32 or 64).
-fillHole :: Template text filling
+fillHole :: HExp text filling
              -> Natural -- ^ Hole index to fill
              -> filling -- ^ Hole filling
-             -> Maybe (Template text filling)
-fillHole (Template t hlsProps) i c = 
+             -> Maybe (HExp text filling)
+fillHole (HExp t hlsProps) i c = 
     case (i,hlsProps) of
-        EmptyHole  _   (hls,fhls) -> Just $ Template t (i `L.delete` hls,insert i c fhls)
-        FilledHole _ _ (hls,fhls) -> Just $ Template t (hls,insert i c fhls)
+        EmptyHole  _   (hls,fhls) -> Just $ HExp t (i `L.delete` hls,insert i c fhls)
+        FilledHole _ _ (hls,fhls) -> Just $ HExp t (hls,insert i c fhls)
         UndefHole  _   _          -> Nothing
 
--- | Plug an unfilled hole in a template with some text. Returns @Nothing@ when
--- the hole index doesn't exist in the template or is filled, otherwise returns
--- a template with the hole plugged. Plugging a hole replaces the hole with the
+-- | Plug an unfilled hole in an expression with some filling. Returns @Nothing@ when
+-- the hole index doesn't exist in the expression or is filled, otherwise returns
+-- an expression with the hole plugged. Plugging a hole replaces the hole with the
 -- value unlike `fillHole`.
 plugHoleI :: Semigroup text
           => (filling -> text)
-          -> ITemplate text
+          -> IHExp text
           -> [Natural]           -- ^ List of unfilled holes
           -> Natural             -- ^ Hole index to plug
           -> filling             -- ^ Text to replace hole
-          -> Maybe (ITemplate text)
+          -> Maybe (IHExp text)
 plugHoleI toText (ICompose p h (IChunk s)) hls i c 
     | i == h && h `elem` hls = Just $ IChunk $ p <> toText c <> s
 plugHoleI toText (ICompose p h r@(ICompose p' h' s)) hls i c 
@@ -386,30 +386,30 @@ plugHoleI toText (ICompose p h r@(ICompose p' h' s)) hls i c
                      Just $ ICompose p h r'
 plugHoleI _ _ _ _ _ = Nothing       
 
--- | Plug an unfilled hole in a template with some text. Returns @Nothing@ when
--- the hole index doesn't exist in the template or is filled, otherwise returns
--- a template with the hole plugged. Plugging a hole replaces the hole with the
+-- | Plug an unfilled hole in an expression with some filling. Returns @Nothing@ when
+-- the hole index doesn't exist in the expression or is filled, otherwise returns
+-- an expression with the hole plugged. Plugging a hole replaces the hole with the
 -- value unlike `fillHole`.
 plugHole :: HoleFillingExp text filling 
-         => Template text filling
+         => HExp text filling
          -> Natural   -- ^ Hole index to plug
          -> filling   -- ^ Text to replace hole
-         -> Maybe (Template text filling)
-plugHole (Template t@(ICompose _ _ _) (hls,fhls)) i c | i `elem` hls = 
+         -> Maybe (HExp text filling)
+plugHole (HExp t@(ICompose _ _ _) (hls,fhls)) i c | i `elem` hls = 
         do t' <- plugHoleI hfExpToText t hls i c
-           pure $ Template t' (i `L.delete` hls,fhls)
+           pure $ HExp t' (i `L.delete` hls,fhls)
 plugHole _ _ _ = Nothing
 
--- | Plugs every hole in a template with no filled holes using the given plug
+-- | Plugs every hole in an expression with no filled holes using the given plug
 -- function. If the plug function is defined for every hole in the input
--- template, then this function guarantees a template with no holes (a text).
+-- expression, then this function guarantees an expression with no holes (a constant).
 plugAllI 
     :: Semigroup text
     => (filling -> text)
     -> [Natural]
     -> (Natural -> Maybe filling)  -- ^ Plug function.
-    -> ITemplate text              -- ^ ITemplate to plug.
-    -> Maybe (ITemplate text)
+    -> IHExp text              -- ^ IHExp to plug.
+    -> Maybe (IHExp text)
 plugAllI toText hls f (ICompose chk i r) | i `elem` hls = do
     chk' <- f i
     IChunk chk'' <- plugAllI toText hls f r
@@ -417,15 +417,15 @@ plugAllI toText hls f (ICompose chk i r) | i `elem` hls = do
 plugAllI _ _ _ (ICompose _ _ _) = Nothing
 plugAllI _ _ _ t@(IChunk _) = return t
 
--- | Plugs every hole in a template with no filled holes using the given plug
+-- | Plugs every hole in an expression with no filled holes using the given plug
 -- function. If the plug function is defined for every hole in the input
--- template, then this function guarantees a template with no holes (a text) is
+-- expression, then this function guarantees an expression with no holes (a constant) is
 -- returned.
 plugAll :: HoleFillingExp text filling 
-        => Template text filling                     -- ^ Template to plug
+        => HExp text filling                     -- ^ HExp to plug
         -> ([Natural] -> (Natural -> Maybe filling)) -- ^ Plug function
         -> Maybe text
-plugAll (Template t (hls,fhls)) f | M.null fhls = 
+plugAll (HExp t (hls,fhls)) f | M.null fhls = 
     case plugAllI hfExpToText hls (f hls) t of        
         Just (IChunk c) -> Just c
         _               -> Nothing
@@ -433,10 +433,10 @@ plugAll _ _ = Nothing
 
 -- | In the simplest form, a type @filling@ is a hole filling expression if it
 -- can be converted into @text@, because values of type @filling@ will
--- ultimately plug the hole they are filling. Optionally, a notion of
--- meta-variable can be declared and a parser from t`Text` into @filling@ can be
--- declared as well. These make it easier to plug a custom parser in for @text@
--- making use of the existing parsers for the various instances of t`Template`.
+-- ultimately plug the hole they are filling. Optionally, a parser from t`Text`
+-- into @filling@ can be declared as well. This make it easier to plug a custom
+-- parser in for @text@ making use of the existing parsers for the various
+-- instances of t`HExp`.
 class (Monoid text,Eq filling) => HoleFillingExp text filling  where    
     hfExpToText :: filling -> text    
 
@@ -457,41 +457,40 @@ instance HoleFillingExp String Text where
     parseHFExp :: Maybe(Text -> Either Text Text)
     parseHFExp = Just $ Right
 
--- | This class is used to define generic combinators on templates. Simply, this
--- is the class of types that can be converted into a t`Template`.
-class HoleFillingExp text filling => ToTemplate text filling a where
-    toTemplate :: a -> Template text filling
+-- | This class is used to define generic combinators on holey expressions. Simply, this
+-- is the class of types that can be converted into a t`HExp`.
+class HoleFillingExp text filling => ToHExp text filling a where
+    toHExp :: a -> HExp text filling
 
 -- | Used to add `HoleFillingExp` constraints to functions that don't take in an
--- explicit t`Template`. This is useful for writing generic functions. For an
--- example, see `Data.TextTemplate.QQInternal.textTemplate2QExp`.
+-- explicit t`HExp`. This is useful for writing generic functions. 
 data Proxy filling r = Proxy {
     runProxy :: r
 }
 
-instance (ToTemplate text filling a) => ToTemplate text filling (Either (Template text filling) a) where
-    toTemplate :: Either (Template text filling) a -> Template text filling
-    toTemplate (Left t)  = t
-    toTemplate (Right a) = toTemplate a
+instance (ToHExp text filling a) => ToHExp text filling (Either (HExp text filling) a) where
+    toHExp :: Either (HExp text filling) a -> HExp text filling
+    toHExp (Left t)  = t
+    toHExp (Right a) = toHExp a
 
 instance Monoid text => HoleFillingExp text () where
     hfExpToText :: () -> text
     hfExpToText () = mempty
 
--- | Translates a list into a template list where each template in the input
--- list is separated by the input template.
-sepTemplatesBy :: (ToTemplate text filling a)
-               => Template text filling   -- ^ Separator
-               -> [a] -- ^ List of templates
-               -> Template text filling
-sepTemplatesBy _ []  = chunk mempty
-sepTemplatesBy _ [v] = toTemplate v
-sepTemplatesBy sep (v:vs) = toTemplate v +> sep +> sepTemplatesBy sep vs 
+-- | Translates a list into an expression list where each expression in the input
+-- list is separated by the input expression.
+sepHExpsBy :: (ToHExp text filling a)
+           => HExp text filling   -- ^ Separator
+           -> [a]                 -- ^ List of holey expressions
+           -> HExp text filling
+sepHExpsBy _   []     = chunk mempty
+sepHExpsBy _   [v]    = toHExp v
+sepHExpsBy sep (v:vs) = toHExp v +> sep +> sepHExpsBy sep vs 
 
--- | Add a prefix and suffix templates to the given value.
-betweenTemplate :: (ToTemplate text filling a) 
-                => Template text filling     -- ^ Prefix template
-                -> Template text filling     -- ^ Suffice template
-                -> a              -- ^ Value to be converted into a template
-                -> Template text filling
-betweenTemplate b a (toTemplate->t) = b +> t +> a
+-- | Add a prefix and suffix holey expressions to the given value.
+betweenHExp :: (ToHExp text filling a) 
+            => HExp text filling     -- ^ Prefix expression
+            -> HExp text filling     -- ^ Suffice expression
+            -> a                     -- ^ Value to be converted into an expression
+            -> HExp text filling
+betweenHExp b a (toHExp->t) = b +> t +> a

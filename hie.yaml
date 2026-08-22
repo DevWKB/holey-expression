@@ -1,7 +1,7 @@
 cradle:
   stack:
     - path: "./src"
-      component: "text-templates:lib"
+      component: "holey-expression:lib"
 
     - path: "./test"
-      component: "text-templates:test:text-templates-test"
+      component: "holey-expression:test:holey-expression-test"

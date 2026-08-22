@@ -1,94 +1,54 @@
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 {-|
-Module      : TextTemplate
-Description : Framework for creating text templates
+Module      : Text
+Description : Holey Text Expressions
 Copyright   : (c) Harley Eades, 2026
               (c) W⋊B, 2026
-Maintainer  : harley.eades@gmail.me
+Maintainer  : harley.eades@gmail.com
 
-Templates are essentially monoids with two types of elements "chunks of text"
-and "holes". Then when all holes are plugged in a template it corresponds to a
-piece of text; here we are using @text@ abstractly, and in fact, the base
-definition of `Template`'s is abstract in both the type of text as well as the
-type of values you can fill holes with.
-
-A simple example:
-
->>> let t = (chunk "Today's Temperature: ") +> (hole 1) +> (chunk " high/") +> (hole 2) +> (chunk " low") :: Template Text Double
->>> t
-Today's Temperature: $1{} high/$2{} low
-
->>> plugAll t $ \_ -> \i -> if i == 1 then Just 91.2 else if i == 2 then Just 87.0 else Nothing 
-Just "Today's Temperature: 91.2 high/87.0 low"
-
-The above is an example of a Text template of type @Template Text Double@ where
-the first type is the type we are ultimately constructing a value of when all
-holes are plugged, and the second type is the type of the filling we place in
-the holes.
-
-A second way we can write the same template using @OverloadedStrings@ is:
-
->>> let t'' = "Today's Temperature: " <> (hole 1) <> " high/" <> (hole 2) <> " low" :: Template Text Double
->>> t ==> t''
-True
-
-There is a third way as well, but it requires Template Haskell; see
-"Data.TextTemplate.TextTemplateQQ".
 -}
-{-# LANGUAGE PatternSynonyms       #-}
-{-# LANGUAGE TypeApplications      #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# OPTIONS_GHC -Wno-orphans       #-}
-module Data.TextTemplate  (-- * Templates
-                           Data.Text.Text
-                          ,module Data.TextTemplate.Template
-                           -- * Text Templates
-                          ,bracketTemplate
-                          ,braceTemplate
-                          -- ** Parsing
-                          ,Parser
-                          ,TParseError
-                          ,templateParser
-                          ,parseTemplate
-                          ,varParser                          
-                          -- *** Helpers
-                          ,maybeParser
-                          ,doubleQuotedParser
-                          ,runParsecT) where
+module Data.HoleyExp.Text
+(-- * Templates
+     Data.Text.Text
+    ,module Data.HoleyExp.HExp
+    -- * Text Templates
+    ,bracketTemplate
+    ,braceTemplate
+    -- ** Parsing
+    ,Parser
+    ,TParseError
+    ,templateParser
+    ,parseTemplate
+    ,varParser                          
+    -- *** Helpers
+    ,maybeParser
+    ,doubleQuotedParser
+    ,runParsecT
+     -- * Text Helpers
+    ,between
+    ,braces
+    ,brackets
+    ,prettyList
+    ,doubleQuote
+    ,prettyDouble) where
 
-import Data.TextTemplate.Template 
-import Text.Megaparsec             (ShowErrorComponent (..)
-                                   ,ParseErrorBundle
-                                   ,ParsecT
-                                   ,Parsec
-                                   ,MonadParsec (..)
-                                   ,parse
-                                   ,errorBundlePretty
-                                   ,runParserT
-                                   ,many
-                                   ,choice
-                                   ,satisfy
-                                   ,customFailure
-                                   ,some
-                                   ,(<|>)
-                                   ,atEnd
-                                   ,skipCount
-                                   ,between)
-import Data.Text                   (Text)
-import Data.Void                   (Void)
-import Data.NatMap                 (Natural)
-import Data.String                 (IsString (..))
-import Data.Text                   qualified as DT
-import Text.Megaparsec.Char        (string,digitChar
-                                   ,char
-                                   ,space)
-import Data.Char                   (isAsciiLower
-                                   ,isAlphaNum
-                                   ,isAscii)
-import Data.Maybe                  (isNothing)
-import Data.List                   qualified as L
-import Text.Megaparsec.Byte.Lexer  (symbol)
+import Data.Text (Text)
+import Data.Text qualified as DT
+import Text.Megaparsec (ShowErrorComponent (..), Parsec, ParseErrorBundle, ParsecT, MonadParsec (..), parse, errorBundlePretty, runParserT, many, choice, satisfy, customFailure, some, (<|>), atEnd, skipCount)
+
+import Data.HoleyExp.HExp
+import Data.Void (Void)
+import Data.NatMap (Natural)
+import Data.String (IsString (fromString))
+import Text.Megaparsec.Char (string, digitChar, char, space)
+import Data.Char (isAsciiLower, isAlphaNum, isAscii)
+import Data.Maybe (isNothing)
+import qualified Text.Megaparsec as MT
+import qualified Data.List as L
+import Text.Megaparsec.Byte.Lexer ( symbol )
 
 -- | Type of tokens.
 type Tok = Text
@@ -168,15 +128,15 @@ varParser = do
     else DT.unpack <$> takeWhile1P Nothing (\c -> isAlphaNum c && isAscii c)
 
 -- | Add brackets `[]` around the input template.
-bracketTemplate :: (ToTemplate Text filling a) => a -> Template Text filling
-bracketTemplate = betweenTemplate (chunk "[") (chunk "]")
+bracketTemplate :: (ToHExp Text filling a) => a -> HExp Text filling
+bracketTemplate = betweenHExp (chunk "[") (chunk "]")
 
 -- | Add braces `{}` around the input template.
-braceTemplate :: (ToTemplate Text filling a) => a -> Template Text filling
-braceTemplate = betweenTemplate (chunk "{") (chunk "}")
+braceTemplate :: (ToHExp Text filling a) => a -> HExp Text filling
+braceTemplate = betweenHExp (chunk "{") (chunk "}")
 
 -- | Parse a template.
-parseTemplate :: HoleFillingExp Text filling => Text -> Either Text (Template Text filling)
+parseTemplate :: HoleFillingExp Text filling => Text -> Either Text (HExp Text filling)
 parseTemplate s = 
     case parse templateParser "text-templates" s of
          Left bundle -> Left . DT.pack $ errorBundlePretty bundle
@@ -217,7 +177,7 @@ holeFillingParser = maybe n p (parseHFExp @Text)
 
         p :: (Text -> Either Text filling) -> Parser (Maybe filling)
         p expParser = do
-            f <- Text.Megaparsec.between (char '{') (char '}') $ many $ templateCharParser True
+            f <- MT.between (char '{') (char '}') $ many $ templateCharParser True
             if L.null f
             then pure Nothing 
             else do let e = expParser . DT.pack $ f
@@ -225,7 +185,7 @@ holeFillingParser = maybe n p (parseHFExp @Text)
                         Left err -> customFailure $ HFExpParseError err
                         Right f' -> pure . Just $ f'
 
--- | Parse a `Data.TextTemplate.Hole`. That is, a pair of a hole index and a filling.
+-- | Parse a `Data.HExp.Hole`. That is, a pair of a hole index and a filling.
 holeParser :: HoleFillingExp Text filling => Parser (Natural, Maybe filling)
 holeParser = do
     skip (string "$")
@@ -238,7 +198,7 @@ chunkParser :: IsString text => Parser text
 chunkParser = fromString <$> many (templateCharParser False)
 
 -- | Parse a template either as a `Chunk` or a `Compose`.
-templateParser :: HoleFillingExp Text filling => Parser (Template Text filling)
+templateParser :: HoleFillingExp Text filling => Parser (HExp Text filling)
 templateParser = do
     mc <- chunkParser
     isEnd <- atEnd
@@ -271,7 +231,7 @@ escapedTemplateCharParser = do
 
 -- | Parse a double-quoted output of the input parser.
 doubleQuotedParser :: Ord e => Parsec e Tok a -> Parsec e Tok a
-doubleQuotedParser = Text.Megaparsec.between (string "\"") (tok "\"")
+doubleQuotedParser = MT.between (string "\"") (tok "\"")
 
 -- * Tokens
 
@@ -284,3 +244,36 @@ tok = symbol space
 skip :: Parsec e Tok Tok -> Parsec e Tok ()
 skip = skipCount 1
 
+-- | Add a prefix and a suffix to the input text.
+between :: Text -> Text -> Text -> Text
+between b a t = b <> t <> a
+
+-- | Add braces around the input text.
+braces :: Text -> Text
+braces = between (DT.singleton '{') (DT.singleton '}')
+
+-- | Add brackets around the input text.
+brackets :: Text -> Text
+brackets = between (DT.singleton '[') (DT.singleton ']')
+
+-- | Convert the input list into a comma separated list in a human-readable
+-- format. This is essentially `Data.Text.show`, but without the quoting of
+-- literals.
+prettyList :: (a -> Text) -> [a] -> Text
+prettyList f = brackets . aux 
+    where
+        aux []     = DT.Empty
+        aux [x]    = f x
+        aux (x:xs) = f x <> ", " <> aux xs
+
+-- | Convert the input double into a human-readable format. This drops the
+-- decimal point when the input is a whole number.
+prettyDouble :: Double -> Text
+prettyDouble (DT.show->n) =     
+    case DT.break (=='.') n of
+        (ds,".0") -> ds
+        _ -> n
+
+-- | Double quote the input text.
+doubleQuote :: DT.Text -> DT.Text
+doubleQuote = between (DT.singleton '\"') (DT.singleton '\"')

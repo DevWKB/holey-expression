@@ -1,20 +1,45 @@
 {-|
-Module      : Template
-Description : The combinator library of templates
+Module      : HExp
+Description : Framework for creating text Holey Expressions
 Copyright   : (c) Harley Eades, 2026
               (c) W⋊B, 2026
-Maintainer  : harley.eades@gmail.com
+Maintainer  : harley.eades@gmail.me
 
-The base combinator library for templates. 
+Holey expressions are essentially monoids with two types of elements "chunks of
+text" (constants) and "holes" (placeholders for constants). Then when all holes 
+are plugged in an expression it corresponds to a piece of text; here we are using 
+@text@ abstractly, and in fact, the base definition of `HExp`'s is abstract in 
+both the type of text as well as the type of values you can fill holes with.
 
-Write this from the perspective of monoids.
+A simple example:
+
+>>> let t = (chunk "Today's Temperature: ") +> (hole 1) +> (chunk " high/") +> (hole 2) +> (chunk " low") :: HExp Text Double
+>>> t
+Today's Temperature: $1{} high/$2{} low
+
+>>> plugAll t $ \_ -> \i -> if i == 1 then Just 91.2 else if i == 2 then Just 87.0 else Nothing 
+Just "Today's Temperature: 91.2 high/87.0 low"
+
+The above is an example of an expression of type @HExp Text Double@ where
+the first type is the type of constants which is what we are ultimately constructing a value of when all
+holes are plugged, and the second type is the type of the filling we place in
+the holes.
+
+A second way we can write the same expression using @OverloadedStrings@ is:
+
+>>> let t'' = "Today's Temperature: " <> (hole 1) <> " high/" <> (hole 2) <> " low" :: HExp Text Double
+>>> t ==> t''
+True
+
+There is a third way as well, but it requires HExp Haskell; see
+"Data.HoleyExp.HExpQQ".
 -}
-module  Data.TextTemplate.Template 
-                           (-- * Templates 
-                            Template
+module  Data.HoleyExp.HExp 
+                           (-- * Holey Expressions 
+                            HExp
                             ,TextLike(..)
                             ,HoleFillingExp(..)
-                            ,ToTemplate(..)
+                            ,ToHExp(..)
                             -- ** Holes                            
                            ,Hole
                             -- *** Patterns
@@ -36,17 +61,17 @@ module  Data.TextTemplate.Template
                            ,pattern Empty
                            ,pattern Chunk
                            ,pattern Compose                           
-                            -- ** Template Combinators
+                            -- ** Combinators
                            ,hole
                            ,filled
                            ,chunk
                            ,(+>)                                                      
-                           -- *** Plugging Holes in Templates
+                           -- *** Plugging Holes
                            ,plugHole
                            ,plugAll
                            ,fillHole
                            ,placeInHole
-                           -- *** Template Hole Properties
+                           -- *** Hole Properties
                            ,unfilledHoles
                            ,filledHoles
                            ,numberOfUnfilledHoles
@@ -55,8 +80,8 @@ module  Data.TextTemplate.Template
                            ,(==>)
                            -- *** Useful Helpers
                            ,showAST
-                           ,sepTemplatesBy 
-                           ,betweenTemplate
+                           ,sepHExpsBy
+                           ,betweenHExp
                            ,chunkToText) where
 
-import Data.TextTemplate.TemplateInternal
+import Data.HoleyExp.HExpInternal
