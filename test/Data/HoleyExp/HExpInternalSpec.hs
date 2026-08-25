@@ -5,27 +5,21 @@ Copyright   : (c) Harley Eades, 2026
               (c) W⋊B, 2026
 Maintainer  : harley.eades@gmail.com
 
-Various properties of the internals of the text templates API.
+Various properties of the holey-expressions API.
 -}
-{-# OPTIONS_GHC -Wno-unused-imports #-}
 module  Data.HoleyExp.HExpInternalSpec (spec) where
 
-import Test.Hspec            
-import Test.QuickCheck.HExp
-import Test.Helpers                       (parseTest)
 import Data.HoleyExp.HExpInternal
 import Data.HoleyExp.Text
-import Test.QuickCheck                     (Property
-                                           ,Testable (property)
-                                           ,verboseCheck
-                                           ,Arbitrary)
-import Test.Hspec.QuickCheck               (prop)
-import Data.Text                           (Text)
+import Test.QuickCheck.HExp                ()
 
+import Test.Hspec            
+import Test.Helpers                        (parseTest)
+import Test.QuickCheck                     (Property
+                                           ,Testable (property))
+import Test.Hspec.QuickCheck               (prop)
 import Test.Helpers                        (UnitTest(..)
-                                           ,test_case, testParser)
-import Data.Maybe                          (isJust)
-import Text.Megaparsec                     (parse)
+                                           ,test_case)
 
 spec :: Spec 
 spec = do
@@ -44,7 +38,7 @@ spec = do
                 test_case "no closing brace"         test_parseFail4
                 test_case "non-escaped curly brace"  test_parseFail5
                 test_case "non-escaped backslash"    test_parseFail6
-                test_case "filling in unit template" test_parseFail7
+                test_case "filling in unit hole"     test_parseFail7
 
 prop_associativeCompose 
     :: HExp Text Text
@@ -61,10 +55,10 @@ prop_identityCompose t = property $
     (empty +> t) == t && (t +> empty) == t
 
 testParseHExp :: Parser (HExp Text Text)
-testParseHExp = templateParser
+testParseHExp = hExpParser
 
-testParseUnitTemplate :: Parser (HExp Text ())
-testParseUnitTemplate = templateParser
+testParseUnitHExp :: Parser (HExp Text ())
+testParseUnitHExp = hExpParser
 
 test_parseFail1 :: UnitTest (Maybe (HExp Text Text))
 test_parseFail1 = UnitTest {
@@ -104,6 +98,6 @@ test_parseFail6 = UnitTest {
 
 test_parseFail7 :: UnitTest (Maybe (HExp Text ()))
 test_parseFail7 = UnitTest {
-         test_result=parseTest testParseUnitTemplate "foo$1{aa}bar"
+         test_result=parseTest testParseUnitHExp "foo$1{aa}bar"
         ,test_output=Nothing
     }

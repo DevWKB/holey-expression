@@ -4,24 +4,56 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-|
 Module      : Text
-Description : Holey Text Expressions
+Description : Holey Expressions in Text
 Copyright   : (c) Harley Eades, 2026
               (c) W⋊B, 2026
 Maintainer  : harley.eades@gmail.com
 
+Holey expressions are essentially monoids with two types of elements "chunks of
+text" (constants) and "holes" (placeholders for constants). Then when all holes 
+are plugged in an expression it corresponds to a piece of text; here we are using 
+@text@ abstractly, and in fact, the base definition of t`HExp`'s is abstract in 
+both the type of text as well as the type of values you can fill holes with.
+
+A simple example:
+
+>>> let t = (chunk "Today's Temperature: ") +> (hole 1) +> (chunk " high/") +> (hole 2) +> (chunk " low") :: HExp Text Double
+>>> t
+Today's Temperature: $1{} high/$2{} low
+
+>>> plugAll t $ \_ -> \i -> if i == 1 then Just 91.2 else if i == 2 then Just 87.0 else Nothing 
+Just "Today's Temperature: 91.2 high/87.0 low"
+
+The above is an example of an expression of type @HExp Text Double@ where
+the first type is the type of constants which is what we are ultimately constructing a value of when all
+holes are plugged, and the second type is the type of the filling we place in
+the holes.
+
+A second way we can write the same expression using @OverloadedStrings@ is:
+
+>>> let t'' = "Today's Temperature: " <> (hole 1) <> " high/" <> (hole 2) <> " low" :: HExp Text Double
+>>> t ==> t''
+True
+
+We can also add a filling to holes in an expression:
+
+>>> "Today's Temperature: " <> (filled 1 92.2) <> " high/" <> (filled 2 91.2) <> " low" :: HExp Text Double
+Today's Temperature: $1{92.2} high/$2{91.2} low
+
 -}
 module Data.HoleyExp.Text
-(-- * Templates
-     Data.Text.Text
-    ,module Data.HoleyExp.HExp
-    -- * Text Templates
-    ,bracketTemplate
-    ,braceTemplate
+(-- * Holey Expressions     
+    -- | This module reexports the holey-expression base.
+    module Data.HoleyExp.HExp
+    -- * Text Combinators
+    ,Data.Text.Text
+    ,bracketHExp
+    ,braceHExp
     -- ** Parsing
     ,Parser
     ,TParseError
-    ,templateParser
-    ,parseTemplate
+    ,hExpParser
+    ,parseHExp
     ,varParser                          
     -- *** Helpers
     ,maybeParser
@@ -35,28 +67,45 @@ module Data.HoleyExp.Text
     ,doubleQuote
     ,prettyDouble) where
 
-import Data.Text (Text)
-import Data.Text qualified as DT
-import Text.Megaparsec (ShowErrorComponent (..), Parsec, ParseErrorBundle, ParsecT, MonadParsec (..), parse, errorBundlePretty, runParserT, many, choice, satisfy, customFailure, some, (<|>), atEnd, skipCount)
-
 import Data.HoleyExp.HExp
-import Data.Void (Void)
-import Data.NatMap (Natural)
-import Data.String (IsString (fromString))
-import Text.Megaparsec.Char (string, digitChar, char, space)
-import Data.Char (isAsciiLower, isAlphaNum, isAscii)
-import Data.Maybe (isNothing)
-import qualified Text.Megaparsec as MT
-import qualified Data.List as L
-import Text.Megaparsec.Byte.Lexer ( symbol )
 
--- | Type of tokens.
-type Tok = Text
+import Data.Text                  (Text)
+import Data.Text                  qualified as DT
+import Data.Void                  (Void)
+import Data.NatMap                (Natural)
+import Data.String                (IsString (fromString))
+import Data.Char                  (isAsciiLower
+                                  ,isAlphaNum
+                                  ,isAscii)
+import Data.Maybe                 (isNothing)
+import Text.Megaparsec            (ShowErrorComponent (..)
+                                  ,Parsec
+                                  ,ParseErrorBundle
+                                  ,ParsecT
+                                  ,MonadParsec (..)
+                                  ,parse
+                                  ,errorBundlePretty
+                                  ,runParserT
+                                  ,many
+                                  ,choice
+                                  ,satisfy
+                                  ,customFailure
+                                  ,some
+                                  ,(<|>)
+                                  ,atEnd
+                                  ,skipCount)
+import Text.Megaparsec.Char       (string
+                                  ,digitChar
+                                  ,char
+                                  ,space)
+import Text.Megaparsec.Byte.Lexer (symbol)
+import Text.Megaparsec            qualified as MT
+import Data.List                  qualified as L
 
 -- | Combinator for running a `Parsec` parser with a `Text` input stream and
 -- custom error messages.
 runParsec :: ShowErrorComponent e => Parsec e Text b -> Text -> Either Text b
-runParsec p s = case parse p "text-templates" s of
+runParsec p s = case parse p "holey-expression" s of
     Left bundle -> Left . DT.pack $ errorBundlePretty bundle
     Right t -> Right t
 
@@ -64,7 +113,7 @@ runParsec p s = case parse p "text-templates" s of
 -- custom error messages.
 runParsecT 
     :: (Monad m, ShowErrorComponent e) 
-    => (m (Either (ParseErrorBundle Tok e) a) -> (Either (ParseErrorBundle Tok e) a))
+    => (m (Either (ParseErrorBundle Text e) a) -> (Either (ParseErrorBundle Text e) a))
     -> ParsecT e Text m a
     -> Text
     -> Either Text a
@@ -82,13 +131,13 @@ instance HoleFillingExp Text Text where
         where            
             textFillingParser = DT.pack <$> many charTextFillingParser
 
-            charTextFillingParser :: Parsec TParseError Tok Char
+            charTextFillingParser :: Parsec TParseError Text Char
             charTextFillingParser = choice [
                     satisfy (\c -> c /= '{' && c /= '}' && c /= '\\'),
                     escapeCharTextFillingParser
                 ]
 
-            escapeCharTextFillingParser :: Parsec TParseError Tok Char
+            escapeCharTextFillingParser :: Parsec TParseError Text Char
             escapeCharTextFillingParser = do
                 skip (string "\\")
                 satisfy (`elem` ['{','}','\\'])
@@ -99,10 +148,6 @@ instance HoleFillingExp Text Int where
   
   parseHFExp :: Maybe (Text -> Either Text Int)
   parseHFExp = Just . runParsec @Void $ read <$> many digitChar
-
-instance TextLike Double where
-    toText :: Double -> Text
-    toText = DT.show
 
 instance HoleFillingExp Text Double where
     hfExpToText :: Double -> Text
@@ -127,18 +172,18 @@ varParser = do
     then customFailure $ HFExpParseError "variables must begin with a lower-case letter"
     else DT.unpack <$> takeWhile1P Nothing (\c -> isAlphaNum c && isAscii c)
 
--- | Add brackets `[]` around the input template.
-bracketTemplate :: (ToHExp Text filling a) => a -> HExp Text filling
-bracketTemplate = betweenHExp (chunk "[") (chunk "]")
+-- | Add brackets `[]` around the input expressions.
+bracketHExp :: (ToHExp Text filling a) => a -> HExp Text filling
+bracketHExp = betweenHExp (chunk "[") (chunk "]")
 
--- | Add braces `{}` around the input template.
-braceTemplate :: (ToHExp Text filling a) => a -> HExp Text filling
-braceTemplate = betweenHExp (chunk "{") (chunk "}")
+-- | Add braces `{}` around the input expressions.
+braceHExp :: (ToHExp Text filling a) => a -> HExp Text filling
+braceHExp = betweenHExp (chunk "{") (chunk "}")
 
--- | Parse a template.
-parseTemplate :: HoleFillingExp Text filling => Text -> Either Text (HExp Text filling)
-parseTemplate s = 
-    case parse templateParser "text-templates" s of
+-- | Parse a holey expression in t`Text`.
+parseHExp :: HoleFillingExp Text filling => Text -> Either Text (HExp Text filling)
+parseHExp s = 
+    case parse hExpParser "holey-expression" s of
          Left bundle -> Left . DT.pack $ errorBundlePretty bundle
          Right t -> Right t
 
@@ -150,12 +195,12 @@ data TParseError
 
 instance ShowErrorComponent TParseError where
     showErrorComponent :: TParseError -> String
-    showErrorComponent err = "text-templates-parser: " <> showErrorComponent' err
+    showErrorComponent err = "holy-expression-parser: " <> showErrorComponent' err
         where
             showErrorComponent' (HFExpParseError err) = DT.unpack err
 
 -- | Type of the parsers that operate on a stream of t`Text`.
-type Parser = Parsec TParseError Tok 
+type Parser = Parsec TParseError Text 
 
 -- | Parse a hole index (`Natural`).
 holeIndexParser :: Parser Natural
@@ -177,7 +222,7 @@ holeFillingParser = maybe n p (parseHFExp @Text)
 
         p :: (Text -> Either Text filling) -> Parser (Maybe filling)
         p expParser = do
-            f <- MT.between (char '{') (char '}') $ many $ templateCharParser True
+            f <- MT.between (char '{') (char '}') $ many $ hExpCharParser True
             if L.null f
             then pure Nothing 
             else do let e = expParser . DT.pack $ f
@@ -195,53 +240,53 @@ holeParser = do
 
 -- | Parse a `Chunk`.
 chunkParser :: IsString text => Parser text
-chunkParser = fromString <$> many (templateCharParser False)
+chunkParser = fromString <$> many (hExpCharParser False)
 
--- | Parse a template either as a `Chunk` or a `Compose`.
-templateParser :: HoleFillingExp Text filling => Parser (HExp Text filling)
-templateParser = do
+-- | Parse an expression either as a `Chunk` or a `Compose`.
+hExpParser :: HoleFillingExp Text filling => Parser (HExp Text filling)
+hExpParser = do
     mc <- chunkParser
     isEnd <- atEnd
     if isEnd
     then pure . Chunk $ mc
     else do h <- holeParser
-            t <- templateParser
+            t <- hExpParser
             pure $ Compose mc h t
 
--- | Parse a template character. These are any unicode character where the
+-- | Parse an expression character. These are any unicode character where the
 -- characters 
 -- > ["$","{","}","\\"] 
 -- are escaped when parsing a hole's filling,
 -- otherwise just @'$'@ needs to be escaped.
-templateCharParser :: Bool -> Parser Char
-templateCharParser filling = choice [
+hExpCharParser :: Bool -> Parser Char
+hExpCharParser filling = choice [
         satisfy (\c -> c /= '$' && c /= '\'' && (if filling then c /= '{' && c /= '}' else True) && c /= '\\'),
-        escapedTemplateCharParser
+        escapedHExpCharParser
     ]
 
 -- | Parsed an escaped character; one of, 
 -- > ["\\$"","\\{"","\\}","\\\\"]
 -- .
-escapedTemplateCharParser :: Parser Char
-escapedTemplateCharParser = do
+escapedHExpCharParser :: Parser Char
+escapedHExpCharParser = do
     skipCount 1 (char '\\')
     satisfy (\c -> c == '$' || c == '{' || c == '}' || c == '\'')
 
 -- * Helper parsers
 
 -- | Parse a double-quoted output of the input parser.
-doubleQuotedParser :: Ord e => Parsec e Tok a -> Parsec e Tok a
+doubleQuotedParser :: Ord e => Parsec e Text a -> Parsec e Text a
 doubleQuotedParser = MT.between (string "\"") (tok "\"")
 
--- * Tokens
+-- * Textens
 
--- | Parse a token (unicode character)
--- Consumes whitespace *after* the parsed token.
-tok :: Ord e => Tok -> Parsec e Tok Tok
+-- | Parse a Texten (unicode character)
+-- Consumes whitespace *after* the parsed Texten.
+tok :: Ord e => Text -> Parsec e Text Text
 tok = symbol space
 
--- | Parse and throw away the symbol parsed by the input token
-skip :: Parsec e Tok Tok -> Parsec e Tok ()
+-- | Parse and throw away the symbol parsed by the input Texten
+skip :: Parsec e Text Text -> Parsec e Text ()
 skip = skipCount 1
 
 -- | Add a prefix and a suffix to the input text.

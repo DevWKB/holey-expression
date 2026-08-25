@@ -5,6 +5,7 @@ Copyright   : (c) Harley Eades, 2026
               (c) W⋊B, 2026
 Maintainer  : harley.eades@gmail.com
 -}
+{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE PatternSynonyms              #-}
 {-# LANGUAGE DataKinds                    #-}
 {-# LANGUAGE TypeOperators                #-}
@@ -22,7 +23,6 @@ Maintainer  : harley.eades@gmail.com
 {-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE FlexibleContexts #-}
 module Data.HoleyExp.HExpInternal where
-
 import Prelude                    hiding (null)
 import Data.Text                  (Text)
 import Data.Text                  qualified as DT
@@ -122,7 +122,7 @@ data IHExp text where
     ICompose :: text -> Natural -> IHExp text -> IHExp text
 
 -- | An expression with pluggable holes. We do not expose the underlying
--- constructor in favor of the combinators.
+-- constructors in favor of the combinators.
 data HExp text filling where
     HExp :: IHExp text        -- ^ Internal expression
          -> HoleProps filling -- ^ Empty holes and hole-filling map
@@ -289,6 +289,18 @@ instance TextLike Text where
 instance TextLike String where
     toText :: String -> Text
     toText = DT.pack
+
+instance TextLike Double where
+    toText :: Double -> Text
+    toText = DT.show
+
+instance TextLike Int where
+    toText :: Int -> Text
+    toText = DT.show
+
+instance TextLike Integer where
+    toText :: Integer -> Text
+    toText = DT.show
 
 -- | Convert a holey expression's AST into a `Text`. The `Show` instance for
 -- t`HExp` is set to pretty print, but for debugging it is sometimes useful to
