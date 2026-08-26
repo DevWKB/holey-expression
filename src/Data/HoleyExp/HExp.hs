@@ -12,21 +12,54 @@ eventually be translated into "text".
 
 Suppose we have a monoid \((\mathsf{Txt},\otimes,\mathsf{e})\), where we call
 elements of \(\mathsf{Txt}\) __chunks__. Furthermore, suppose we have a set
-\(\mathsf{Fill}\) which we call its elements __fillings__. Then we define a
-__hole__ as a function \(h : \mathbb{N} \times \mathsf{Fill}_{\perp} \to \mathsf{Txt}\).
+\(\mathsf{Fill}\) which we call its elements __fillings__. 
 
-We define a __holey expression__ to be a function:
+We define the collection of __holey expressions__ to be:
 
-\( \mathop{exp} : \Pi_{i \in \mathbb{N}}(\mathbb{N},\mathsf{Fill}) \to \mathsf{Txt}  \)
+\( \mathsf{HExp}(\mathsf{Txt},\mathsf{Fill}) = \Pi(\mathsf{Txt} + (\mathbb{N} \times \mathsf{Fill}_{\mathsf{?}}))  \)
 
-Let's consider several example expressions:
+We call elements of \( \mathbb{N} \times \mathsf{Fill}_{\mathsf{?}} \)
+__holes__, and denote __filled holes__ by \($(i,f)\) and __empty holes__ by
+\($(i,\mathsf{?})\). Lastly, composition of expressions, elements of
+\(\mathsf{HExp}\), is concatenation of products denoted by 
+\(e_1 * \cdots * e_i \); note that we leave injections implicit to make the expression more readable.
 
-1. \(\mathop{exp}_2((1,\perp),(2,\perp)) = t_1 \otimes h(1,\perp) \otimes t_2   \otimes h(2,\perp)\)
+Let's consider a few abstract example expressions:
 
-\( t_1 * h(2) = \lambda f.t_1 \otimes h(2,f)  \)
+1. \( t_1 * $(1,\mathsf{?}) * t_2 * $(2,\mathsf{?}) \)
+2. \( t_1 * $(5,f_5) * $(3,\mathsf{?}) * t_2 * $(7,f_7) \)
 
-\( t_1 * h(1,f_1) = \lambda f_\perp.t_1 \otimes h(2,if\,f = \perp\,then\,f_1\,else\,f)  \)
+Now if we choose some concrete sets for \(\mathsf{Txt}\) and \(\mathsf{Fill}\)
+then we can create more interesting expressions:
 
+1. \(123 * $(1,?) * 456 * $(2,5) : \mathsf{HExp}(\mathbb{N},\mathbb{N})\), where
+    \((\mathbb{N},0,+)\) is the monoid for \(\mathsf{Txt}\)
+2. \(\text{"Hi, my name is "} * $(1,?) : \mathsf{HExp}(\Sigma^*,\Sigma^*)\), where
+   \((\Sigma^*,\circ)\) is the monoid of words over the English alphabet.
+3. \($(1,?) * \text{":"} * $(2,?) * \text{":"} * $(3,?) : \mathsf{HExp}(\Sigma^*,\mathbb{N})\), where
+   \((\Sigma^*,\circ)\) is the monoid of words over \(\Sigma = \mathbb{N} \cup \{\text{":"}\}\). 
+    This could represent time.
+
+Holey expressions are ultimately meant to be translated into \(\mathsf{Txt}\) by
+filling in all of their holes. This implies that we must require the existence
+of a function \(p : \mathsf{Fill} \to \mathsf{Txt} \). There are two operations
+on holes: i. plugging a hole (replacing it with a filling) and ii. filling a
+hole (placing a filling inside the hole). 
+
+Plugging a hole amounts to defining a function 
+\(\mathsf{plug} : \mathbb{N} \times \mathsf{Fill}_\mathsf{?} \to \mathsf{Fill}_\perp\)
+that chooses which filling to replace the hole with; note that this is a partial
+function, and is defined per-expression. Then plugging an expression corresponds to
+the function: 
+\( \Pi(\mathsf{id} + (\mathsf{plug};p_\perp)) : \mathsf{HExp}(\mathsf{Txt},\mathsf{Fill}) \to \mathsf{Txt}_\perp \).
+If the plug function is defined for all holes in the input expression, then the
+above composition will indeed yield a chunk (an element of \(\mathsf{Txt}\)).
+
+Filling a hole is a bit more simple, and requires the definition of a function
+\(\mathsf{place} : \mathsf{Fill}_\mathsf{?} \to \mathsf{Fill}_\mathsf{?}\)
+that simply updates the filling in the hole. Then filling an expression corresponds to
+the function: 
+\( \Pi(\mathsf{id} + (\mathsf{id} \times \mathsf{place})) : \mathsf{HExp}(\mathsf{Txt},\mathsf{Fill}) \to \mathsf{HExp}(\mathsf{Txt},\mathsf{Fill}) \).
 -}
 module  Data.HoleyExp.HExp (-- * Holey Expressions 
                             HExp
