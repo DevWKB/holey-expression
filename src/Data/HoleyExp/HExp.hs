@@ -1,9 +1,31 @@
 {-|
 Module      : HExp
-Description : Framework for creating text Holey Expressions
+Description : Holey Expressions
 Copyright   : (c) Harley Eades, 2026
               (c) W⋊B, 2026
 Maintainer  : harley.eades@gmail.com
+
+Holey expressions correspond to a monoid with two kinds of elements: i. chunks
+and ii. holes. The former correspond to chunks of "text" which we leave
+abstract, and the latter correspond to placeholders for values that will
+eventually be translated into "text".
+
+Suppose we have a monoid \((\mathsf{Txt},\otimes,\mathsf{e})\), where we call
+elements of \(\mathsf{Txt}\) __chunks__. Furthermore, suppose we have a set
+\(\mathsf{Fill}\) which we call its elements __fillings__. Then we define a
+__hole__ as a function \(h : \mathbb{N} \times \mathsf{Fill}_{\perp} \to \mathsf{Txt}\).
+
+We define a __holey expression__ to be a function:
+
+\( \mathop{exp} : \Pi_{i \in \mathbb{N}}(\mathbb{N},\mathsf{Fill}) \to \mathsf{Txt}  \)
+
+Let's consider several example expressions:
+
+1. \(\mathop{exp}_2((1,\perp),(2,\perp)) = t_1 \otimes h(1,\perp) \otimes t_2   \otimes h(2,\perp)\)
+
+\( t_1 * h(2) = \lambda f.t_1 \otimes h(2,f)  \)
+
+\( t_1 * h(1,f_1) = \lambda f_\perp.t_1 \otimes h(2,if\,f = \perp\,then\,f_1\,else\,f)  \)
 
 -}
 module  Data.HoleyExp.HExp (-- * Holey Expressions 
@@ -11,10 +33,10 @@ module  Data.HoleyExp.HExp (-- * Holey Expressions
                            ,TextLike(..)
                            ,HoleFillingExp(..)
                            ,ToHExp(..)
-                           -- ** Holes                            
+                           -- __ Holes                            
                            ,Hole
                            ,HoleProps
-                           -- *** Patterns
+                           -- __* Patterns
                            -- | Patterns make it easier to decide if a hole is empty, filled, or neither.
                            -- For example:
                            --
@@ -33,7 +55,7 @@ module  Data.HoleyExp.HExp (-- * Holey Expressions
                            ,pattern Empty
                            ,pattern Chunk
                            ,pattern Compose                           
-                            -- ** Combinators
+                            -- __ Combinators
                             -- | The following combinators are the interface to
                             -- holey expressions. First, there are two
                             -- combinators for holes:
@@ -69,7 +91,7 @@ module  Data.HoleyExp.HExp (-- * Holey Expressions
                            ,filled
                            ,chunk
                            ,(+>)                                                      
-                           -- *** Plugging Holes
+                           -- __* Plugging Holes
                            -- | Holes can be either filled or plugged. The
                            -- former simply places a value of type @filling@
                            -- into the hole, but doesn't replace the hole. The
@@ -82,14 +104,14 @@ module  Data.HoleyExp.HExp (-- * Holey Expressions
                            ,plugAll
                            ,fillHole
                            ,placeInHole
-                           -- *** Hole Properties
+                           -- __* Hole Properties
                            ,unfilledHoles
                            ,filledHoles
                            ,numberOfUnfilledHoles
                            ,numberOfFilledHoles
-                           -- *** Equality
+                           -- __* Equality
                            ,(==>)
-                           -- *** Useful Helpers
+                           -- __* Useful Helpers
                            ,showAST
                            ,sepHExpsBy
                            ,betweenHExp
