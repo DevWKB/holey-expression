@@ -10,8 +10,10 @@ and ii. holes. The former correspond to chunks of "text" which we leave
 abstract, and the latter correspond to placeholders for values that will
 eventually be translated into "text".
 
+= The mathsy explanation
+
 Suppose we have a monoid \((\mathsf{Txt},\otimes,\mathsf{e})\), where we call
-elements of \(\mathsf{Txt}\) __chunks__. Furthermore, suppose we have a set
+elements of \(\mathsf{Txt}\) __text__. Furthermore, suppose we have a set
 \(\mathsf{Fill}\) which we call its elements __fillings__. 
 
 We define the collection of __holey expressions__ to be:
@@ -22,12 +24,21 @@ We call elements of \( \mathbb{N} \times \mathsf{Fill}_{\mathsf{?}} \)
 __holes__, and denote __filled holes__ by \($(i,f)\) and __empty holes__ by
 \($(i,\mathsf{?})\). Lastly, composition of expressions, elements of
 \(\mathsf{HExp}\), is concatenation of products denoted by 
-\(e_1 * \cdots * e_i \); note that we leave injections implicit to make the expression more readable.
+\(e_1 * \cdots * e_i \); 
+note that we leave injections implicit to make the expression more readable.
+
+__Chunks__ are the pieces of text that sit between holes. It's quite simple to
+define the function 
+\(\mathsf{chunk}(t) = t : \mathsf{HExp}(\mathsf{Txt},\mathsf{Fill})\). We
+will leave the application of \(\mathsf{chunk}\) implicit.
 
 Let's consider a few abstract example expressions:
 
-1. \( t_1 * $(1,\mathsf{?}) * t_2 * $(2,\mathsf{?}) \)
-2. \( t_1 * $(5,f_5) * $(3,\mathsf{?}) * t_2 * $(7,f_7) \)
+1. \( t_1 * $(1,\mathsf{?}) * t_2 * $(2,\mathsf{?}) \), has chunks
+   \(\{t_1,t_2\}\) and two empty holes indexed by \(1\) and \(2\).
+2. \( t_1 * $(5,f_5) * $(3,\mathsf{?}) * t_2 * $(7,f_7) \), has chunks
+   \(\{t_1,t_2\}\) and one empty holes indexed by \(3\) and a filled hole index
+   by \(7\) whose filling is \(f_2\).
 
 Now if we choose some concrete sets for \(\mathsf{Txt}\) and \(\mathsf{Fill}\)
 then we can create more interesting expressions:
@@ -53,18 +64,29 @@ function, and is defined per-expression. Then plugging an expression corresponds
 the function: 
 \( \Pi(\mathsf{id} + (\mathsf{plug};p_\perp)) : \mathsf{HExp}(\mathsf{Txt},\mathsf{Fill}) \to \mathsf{Txt}_\perp \).
 If the plug function is defined for all holes in the input expression, then the
-above composition will indeed yield a chunk (an element of \(\mathsf{Txt}\)).
+above composition will indeed yield a text (an element of \(\mathsf{Txt}\)).
 
 Filling a hole is a bit more simple, and requires the definition of a function
 \(\mathsf{place} : \mathsf{Fill}_\mathsf{?} \to \mathsf{Fill}_\mathsf{?}\)
 that simply updates the filling in the hole. Then filling an expression corresponds to
 the function: 
 \( \Pi(\mathsf{id} + (\mathsf{id} \times \mathsf{place})) : \mathsf{HExp}(\mathsf{Txt},\mathsf{Fill}) \to \mathsf{HExp}(\mathsf{Txt},\mathsf{Fill}) \).
+
+Each one of these concepts map to a corresponding item in this module.
+
+= The concrete explanation
+
+Holey expressions, @exp :: `HExp` text filling@, correspond to a monoid in
+`text` where placeholders we call __holes__ can be replaced with a value we call
+a __filling__. This requires that there is a function 
+@`fillingToText` :: filling -> text@ that converts any @filling@ into a @text@.
+This is enforced by the type class @`HoleFilling` text filling@.
+
 -}
 module  Data.HoleyExp.HExp (-- * Holey Expressions 
                             HExp
                            ,TextLike(..)
-                           ,HoleFillingExp(..)
+                           ,HoleFilling(..)
                            ,ToHExp(..)
                            -- __ Holes                            
                            ,Hole

@@ -128,13 +128,13 @@ data HExp text filling where
          -> HoleProps filling -- ^ Empty holes and hole-filling map
          -> HExp text filling
 
-instance (TextLike text, HoleFillingExp text filling) => Show (HExp text filling) where
+instance (TextLike text, HoleFilling text filling) => Show (HExp text filling) where
     show :: HExp text filling -> String    
     show (HExp (IChunk t) _) = DT.unpack . toText $ t    
     show (HExp (ICompose prefix i rest) (emptyHoles, filledHoles))
         = (DT.unpack . toText $ prefix) 
         <> "$" <> show i <> "{"
-        <> (if i `elem` emptyHoles then "" else (DT.unpack . toText . (hfExpToText @text) $ filledHoles ! i))
+        <> (if i `elem` emptyHoles then "" else (DT.unpack . toText . (fillingToText @text) $ filledHoles ! i))
         <> "}" 
         <> show (HExp rest (emptyHoles, filledHoles))
 
@@ -402,13 +402,13 @@ plugHoleI _ _ _ _ _ = Nothing
 -- the hole index doesn't exist in the expression or is filled, otherwise returns
 -- an expression with the hole plugged. Plugging a hole replaces the hole with the
 -- value unlike `fillHole`.
-plugHole :: HoleFillingExp text filling 
+plugHole :: HoleFilling text filling 
          => HExp text filling
          -> Natural   -- ^ Hole index to plug
          -> filling   -- ^ Text to replace hole
          -> Maybe (HExp text filling)
 plugHole (HExp t@(ICompose _ _ _) (hls,fhls)) i c | i `elem` hls = 
-        do t' <- plugHoleI hfExpToText t hls i c
+        do t' <- plugHoleI fillingToText t hls i c
            pure $ HExp t' (i `L.delete` hls,fhls)
 plugHole _ _ _ = Nothing
 
@@ -433,48 +433,48 @@ plugAllI _ _ _ t@(IChunk _) = return t
 -- function. If the plug function is defined for every hole in the input
 -- expression, then this function guarantees an expression with no holes (a constant) is
 -- returned.
-plugAll :: HoleFillingExp text filling 
+plugAll :: HoleFilling text filling 
         => HExp text filling                     -- ^ HExp to plug
         -> ([Natural] -> (Natural -> Maybe filling)) -- ^ Plug function
         -> Maybe text
 plugAll (HExp t (hls,fhls)) f | M.null fhls = 
-    case plugAllI hfExpToText hls (f hls) t of        
+    case plugAllI fillingToText hls (f hls) t of        
         Just (IChunk c) -> Just c
         _               -> Nothing
 plugAll _ _ = Nothing
 
--- | In the simplest form, a type @filling@ is a hole filling expression if it
+-- | In the simplest form, a type @filling@ is a hole filling if it
 -- can be converted into @text@, because values of type @filling@ will
 -- ultimately plug the hole they are filling. Optionally, a parser from t`Text`
--- into @filling@ can be declared as well. This make it easier to plug a custom
+-- into @filling@ can be declared as well. This makes it easier to plug a custom
 -- parser in for @text@ making use of the existing parsers for the various
 -- instances of t`HExp`.
-class (Monoid text,Eq filling) => HoleFillingExp text filling  where    
-    hfExpToText :: filling -> text    
+class (Monoid text,Eq filling) => HoleFilling text filling  where    
+    fillingToText :: filling -> text    
 
-    parseHFExp :: Maybe (Text -> Either Text filling)
-    parseHFExp = Nothing    
+    parseFilling :: Maybe (Text -> Either Text filling)
+    parseFilling = Nothing    
 
-instance HoleFillingExp Text String where
-    hfExpToText :: String -> Text
-    hfExpToText = DT.pack
+instance HoleFilling Text String where
+    fillingToText :: String -> Text
+    fillingToText = DT.pack
 
-    parseHFExp :: Maybe(Text -> Either Text String)
-    parseHFExp = Just $ Right . DT.unpack
+    parseFilling :: Maybe(Text -> Either Text String)
+    parseFilling = Just $ Right . DT.unpack
 
-instance HoleFillingExp String Text where
-    hfExpToText :: Text -> String
-    hfExpToText = DT.unpack
+instance HoleFilling String Text where
+    fillingToText :: Text -> String
+    fillingToText = DT.unpack
 
-    parseHFExp :: Maybe(Text -> Either Text Text)
-    parseHFExp = Just $ Right
+    parseFilling :: Maybe(Text -> Either Text Text)
+    parseFilling = Just $ Right
 
 -- | This class is used to define generic combinators on holey expressions. Simply, this
 -- is the class of types that can be converted into a t`HExp`.
-class HoleFillingExp text filling => ToHExp text filling a where
+class HoleFilling text filling => ToHExp text filling a where
     toHExp :: a -> HExp text filling
 
--- | Used to add `HoleFillingExp` constraints to functions that don't take in an
+-- | Used to add `HoleFilling` constraints to functions that don't take in an
 -- explicit t`HExp`. This is useful for writing generic functions. 
 data Proxy filling r = Proxy {
     runProxy :: r
@@ -485,9 +485,9 @@ instance (ToHExp text filling a) => ToHExp text filling (Either (HExp text filli
     toHExp (Left t)  = t
     toHExp (Right a) = toHExp a
 
-instance Monoid text => HoleFillingExp text () where
-    hfExpToText :: () -> text
-    hfExpToText () = mempty
+instance Monoid text => HoleFilling text () where
+    fillingToText :: () -> text
+    fillingToText () = mempty
 
 -- | Translates a list into an expression list where each expression in the input
 -- list is separated by the input expression.

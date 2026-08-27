@@ -122,12 +122,12 @@ runParsecT eval p s =
         Left bundle -> Left . DT.pack $ errorBundlePretty bundle
         Right t -> Right t
         
-instance HoleFillingExp Text Text where
-    hfExpToText :: Text -> Text
-    hfExpToText = id
+instance HoleFilling Text Text where
+    fillingToText :: Text -> Text
+    fillingToText = id
 
-    parseHFExp :: Maybe (Text -> Either Text Text)
-    parseHFExp = Just $ runParsec textFillingParser
+    parseFilling :: Maybe (Text -> Either Text Text)
+    parseFilling = Just $ runParsec textFillingParser
         where            
             textFillingParser = DT.pack <$> many charTextFillingParser
 
@@ -142,19 +142,19 @@ instance HoleFillingExp Text Text where
                 skip (string "\\")
                 satisfy (`elem` ['{','}','\\'])
 
-instance HoleFillingExp Text Int where
-  hfExpToText :: Int -> Text
-  hfExpToText = DT.show
+instance HoleFilling Text Int where
+  fillingToText :: Int -> Text
+  fillingToText = DT.show
   
-  parseHFExp :: Maybe (Text -> Either Text Int)
-  parseHFExp = Just . runParsec @Void $ read <$> many digitChar
+  parseFilling :: Maybe (Text -> Either Text Int)
+  parseFilling = Just . runParsec @Void $ read <$> many digitChar
 
-instance HoleFillingExp Text Double where
-    hfExpToText :: Double -> Text
-    hfExpToText = toText
+instance HoleFilling Text Double where
+    fillingToText :: Double -> Text
+    fillingToText = toText
 
-    parseHFExp :: Maybe (Text -> Either Text Double)
-    parseHFExp = Just . runParsec @Void $ p
+    parseFilling :: Maybe (Text -> Either Text Double)
+    parseFilling = Just . runParsec @Void $ p
         where
             p :: Parsec Void Text Double
             p = do d1 <- many digitChar 
@@ -181,7 +181,7 @@ braceHExp :: (ToHExp Text filling a) => a -> HExp Text filling
 braceHExp = betweenHExp (chunk "{") (chunk "}")
 
 -- | Parse a holey expression in t`Text`.
-parseHExp :: HoleFillingExp Text filling => Text -> Either Text (HExp Text filling)
+parseHExp :: HoleFilling Text filling => Text -> Either Text (HExp Text filling)
 parseHExp s = 
     case parse hExpParser "holey-expression" s of
          Left bundle -> Left . DT.pack $ errorBundlePretty bundle
@@ -214,8 +214,8 @@ maybeParser :: MonadParsec e s f => f a -> f (Maybe a)
 maybeParser p = try (Just <$> p) <|> pure Nothing
 
 -- | Parse a hole's filling which must be escaped properly.
-holeFillingParser :: HoleFillingExp Text filling => Parser (Maybe filling)
-holeFillingParser = maybe n p (parseHFExp @Text)
+holeFillingParser :: HoleFilling Text filling => Parser (Maybe filling)
+holeFillingParser = maybe n p (parseFilling @Text)
     where
         -- If there is no filling, then skip the braces.
         n = (skip $ string "{}") >> pure Nothing
@@ -231,7 +231,7 @@ holeFillingParser = maybe n p (parseHFExp @Text)
                         Right f' -> pure . Just $ f'
 
 -- | Parse a `Data.HExp.Hole`. That is, a pair of a hole index and a filling.
-holeParser :: HoleFillingExp Text filling => Parser (Natural, Maybe filling)
+holeParser :: HoleFilling Text filling => Parser (Natural, Maybe filling)
 holeParser = do
     skip (string "$")
     i <- holeIndexParser
@@ -243,7 +243,7 @@ chunkParser :: IsString text => Parser text
 chunkParser = fromString <$> many (hExpCharParser False)
 
 -- | Parse an expression either as a `Chunk` or a `Compose`.
-hExpParser :: HoleFillingExp Text filling => Parser (HExp Text filling)
+hExpParser :: HoleFilling Text filling => Parser (HExp Text filling)
 hExpParser = do
     mc <- chunkParser
     isEnd <- atEnd
