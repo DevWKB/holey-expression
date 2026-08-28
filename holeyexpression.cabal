@@ -1,5 +1,5 @@
 cabal-version:  2.4
-name:           holey-expression
+name:           holeyexpression
 version:        0.1.0.0
 license:        BSD-3-Clause
 license-file:   LICENSE.md
@@ -56,9 +56,9 @@ library
       Data.HoleyExp.Text
       Data.NatMap
   other-modules:
-      Paths_holey_expression      
+      Paths_holeyexpression      
   autogen-modules:
-      Paths_holey_expression
+      Paths_holeyexpression
   hs-source-dirs:
       src
   ghc-options: -Wall 
@@ -86,12 +86,12 @@ test-suite holey-expression-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      Paths_holey_expression
+      Paths_holeyexpression
       Data.HoleyExp.HExpInternalSpec
       Test.QuickCheck.HExp
       Test.Helpers
   autogen-modules:
-      Paths_holey_expression
+      Paths_holeyexpression
   hs-source-dirs:
       test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
@@ -103,5 +103,5 @@ test-suite holey-expression-test
     ViewPatterns
     GADTs
   build-depends:     
-    ,holey-expression    
+    ,holeyexpression    
   default-language: Haskell2010

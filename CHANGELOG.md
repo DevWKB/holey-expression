@@ -1,4 +1,4 @@
-# Changelog for `holey-expression`
+# Changelog for `holeyexpression`
 
 All notable changes to this project will be documented in this file.
 
@@ -19,6 +19,7 @@ and this project adheres to the
            - Data.HoleyExp.HExp.plugHole is now plug
            - Data.HoleyExp.HExp.fillHole is now update
            - Data.HoleyExp.HExp.placeInHole is now place
+    - Moved template haskell and JSON out of this package and into their own packages.
 
 ## [0.1.0.0] - 2026-08-14
     - First complete implementation.
