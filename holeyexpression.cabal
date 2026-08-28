@@ -1,6 +1,6 @@
 cabal-version:  2.4
 name:           holeyexpression
-version:        0.1.0.0
+version:        0.2.0.0
 license:        BSD-3-Clause
 license-file:   LICENSE.md
 maintainer:     Harley Eades III <harley.eades@gmail.com>
@@ -13,9 +13,8 @@ homepage:       https://github.com/DevWKB/holey-expression
 bug-reports:    https://github.com/DevWKB/holey-expression/issues
 synopsis:       Add, fill, plug holes in monoids
 description:    
-    In its simplest form, this is a library that allows you to add 
-    placeholders we call "holes" to any monoid. Then these holes 
-    can be filled or plugged.
+    This is a library that allows you to add placeholders we call "holes" 
+    to any monoid. Then these holes can be filled or plugged.
 
 category:       Text
 build-type:     Simple
@@ -30,22 +29,16 @@ source-repository head
 
 common depends
     build-depends:
-       base             >= 4.7    && < 5    
-      ,constraints      >= 0.14.4 && < 0.15
+       base             >= 4.7    && < 5          
       ,containers       >= 0.7    && < 0.8
       ,extra            >= 1.8.1  && < 1.9
       ,megaparsec       >= 9.7.0  && < 9.9
-      ,mtl              >= 2.3.1  && < 2.4
-      ,template-haskell >= 2.22.0 && < 2.24
-      ,text             >= 2.1.3  && < 2.2
-      ,type-natural     >= 1.3.0  && < 1.4
+      ,text             >= 2.1.3  && < 2.2      
 
 common test-depends
     build-depends:
-       HUnit                >= 1.6.2   && < 1.7
-      ,QuickCheck           >  2.15.0  && < 2.19
-      ,hspec                >= 2.11.17 && < 2.12
-      ,hspec-contrib        >= 0.5.2   && < 0.6
+       QuickCheck           >  2.15.0  && < 2.19
+      ,hspec                >= 2.11.17 && < 2.12      
       ,quickcheck-instances >= 0.3.33  && < 0.5
 
 library
