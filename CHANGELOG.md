@@ -8,4 +8,17 @@ and this project adheres to the
 
 ## Unreleased
 
-## 0.1.0.0 - YYYY-MM-DD
+## [0.2.0.0] - 2026-08-28
+### Added
+    - New documentation and complete Haddock docs on all definitions.
+    - New cabal package.
+### Changed
+    - Better naming of combinators. 
+           - Data.HoleyExp.HExp.empty is now emptyExp
+           - Data.HoleyExp.HExp.hole is now empty           
+           - Data.HoleyExp.HExp.plugHole is now plug
+           - Data.HoleyExp.HExp.fillHole is now update
+           - Data.HoleyExp.HExp.placeInHole is now place
+
+## [0.1.0.0] - 2026-08-14
+    - First complete implementation.
