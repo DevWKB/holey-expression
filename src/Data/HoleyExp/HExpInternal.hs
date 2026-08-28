@@ -143,7 +143,7 @@ instance (TextLike text, HoleFilling text filling) => Show (HExp text filling) w
 -- | Pattern synonym for the empty expression.
 pattern Empty :: (Eq text, Monoid text) => HExp text filling
 pattern Empty <- (null -> True) where
-    Empty = empty
+    Empty = emptyExp
 
 -- | Decides if an expression corresponds to a chunk or not. 
 isChunk :: HExp text filling -> Maybe text
@@ -170,7 +170,7 @@ compose :: Monoid text
         -> (Natural,Maybe filling)           
         -> HExp text filling  -- ^ HExp branch
         -> HExp text filling
-compose c (i, Nothing) t = chunk c +> hole i     +> t
+compose c (i, Nothing) t = chunk c +> empty i     +> t
 compose c (i, Just f)  t = chunk c +> filled i f +> t
 
 -- | Decompose an expression into the top-level compose.
@@ -218,10 +218,10 @@ instance (Eq text, Eq filling) => Eq (HExp text filling) where
 (HExp t1 (hls1,fhls1)) ==> (HExp t2 (hls2,fhls2)) = t1 >==> t2 && hls1 == hls2 && fhls1 == fhls2
 
 -- | An empty hole.
-hole :: Monoid text
+empty :: Monoid text
      => Natural -- ^ Hole index
      -> HExp text filling
-hole i = flip HExp ([i],M.empty) $ ICompose mempty i (IChunk mempty)
+empty i = flip HExp ([i],M.empty) $ ICompose mempty i (IChunk mempty)
 
 -- | A hole with a filling. 
 filled :: Monoid text
@@ -238,9 +238,9 @@ chunk :: text -- ^ Constant
 chunk = flip HExp ([],M.empty) .  IChunk
 
 -- | The empty expression.
-empty :: Monoid text 
-      => HExp text filling
-empty = chunk mempty
+emptyExp :: Monoid text 
+         => HExp text filling
+emptyExp = chunk mempty
 
 -- | Composition of `IHExp`.
 (>+>) :: Semigroup text
@@ -265,10 +265,10 @@ instance Semigroup text => Semigroup (HExp text filling) where
 
 instance Monoid text => Monoid (HExp text filling) where
     mempty :: HExp text filling
-    mempty = empty
+    mempty = emptyExp
 
     mconcat :: [HExp text filling] -> HExp text filling
-    mconcat = foldr (<>) empty
+    mconcat = foldr (<>) emptyExp
 
 instance Functor (HExp text) where
     fmap :: (filling1 -> filling2) -> HExp text filling1 -> HExp text filling2
@@ -351,29 +351,36 @@ chunkToText :: HExp text filling
 chunkToText (HExp (IChunk c) ([],fhls)) | M.null fhls = Just c
 chunkToText _                                         = Nothing
 
--- | Like `fillHole`, but doesn't update an already filled hole's value.
-placeInHole :: HExp text filling
+-- | Like `update`, but doesn't update an already filled hole's value.
+place :: HExp text filling
             -> Natural -- ^ Hole index to plug
             -> filling -- ^ Hole filling
             -> Maybe (HExp text filling)
-placeInHole t@(HExp it hlsProps) i c =
+place t@(HExp it hlsProps) i c =
     case (i,hlsProps) of
         EmptyHole  _   (hls,fhls) -> Just $ HExp it $ (i `L.delete` hls,insert i c fhls)
         FilledHole _ _ _          -> Just $ t
         UndefHole  _   _          -> Nothing
 
--- | Fill a hole with a filling. If the hole is already filled, then the filling is
--- updated with the new value. Filling a hole doesn't replace the hole, but
--- simply puts the input @filling@ inside the hole. Returns @Nothing@ if the
--- hole doesn't exist. The complexity of this operation is
--- \(\mathcal{O}(\max(n_0,\min(n_1,W)))\), where \(n_0\) is the number of empty holes, and
--- \(n_1\) is the number of filled holes with a max of \(W\) the number of bits
--- in an `Int` (32 or 64).
-fillHole :: HExp text filling
-             -> Natural -- ^ Hole index to fill
-             -> filling -- ^ Hole filling
+-- | Update a hole adding or removing a filling. If the hole is already filled,
+-- then the filling is updated with the new value. Filling a hole doesn't
+-- replace the hole, but simply puts the input @filling@ inside the hole.
+-- Returns @Nothing@ if the hole doesn't exist. If the input filling is
+-- `Nothing`, then the hole is emptied. The complexity of this operation
+-- is \(\mathcal{O}(\max(n_0,\min(n_1,W)))\), where \(n_0\) is the number of
+-- empty holes, and \(n_1\) is the number of filled holes with a max of \(W\)
+-- the number of bits in an `Int` (32 or 64).
+update :: HExp text filling
+             -> Natural       -- ^ Hole index to fill
+             -> Maybe filling -- ^ Hole filling
              -> Maybe (HExp text filling)
-fillHole (HExp t hlsProps) i c = 
+update (HExp t hlsProps) i Nothing = 
+    case (i,hlsProps) of
+        EmptyHole  _   _          -> Just $ HExp t hlsProps
+        FilledHole _ _ (hls,fhls) -> Just $ HExp t (i `L.insert` hls,delete i fhls)
+        UndefHole  _   _          -> Nothing
+
+update (HExp t hlsProps) i (Just c) = 
     case (i,hlsProps) of
         EmptyHole  _   (hls,fhls) -> Just $ HExp t (i `L.delete` hls,insert i c fhls)
         FilledHole _ _ (hls,fhls) -> Just $ HExp t (hls,insert i c fhls)
@@ -382,7 +389,7 @@ fillHole (HExp t hlsProps) i c =
 -- | Plug an unfilled hole in an expression with some filling. Returns @Nothing@ when
 -- the hole index doesn't exist in the expression or is filled, otherwise returns
 -- an expression with the hole plugged. Plugging a hole replaces the hole with the
--- value unlike `fillHole`.
+-- value unlike `update`.
 plugHoleI :: Semigroup text
           => (filling -> text)
           -> IHExp text
@@ -401,16 +408,16 @@ plugHoleI _ _ _ _ _ = Nothing
 -- | Plug an unfilled hole in an expression with some filling. Returns @Nothing@ when
 -- the hole index doesn't exist in the expression or is filled, otherwise returns
 -- an expression with the hole plugged. Plugging a hole replaces the hole with the
--- value unlike `fillHole`.
-plugHole :: HoleFilling text filling 
+-- value unlike `update`.
+plug :: HoleFilling text filling 
          => HExp text filling
          -> Natural   -- ^ Hole index to plug
          -> filling   -- ^ Text to replace hole
          -> Maybe (HExp text filling)
-plugHole (HExp t@(ICompose _ _ _) (hls,fhls)) i c | i `elem` hls = 
+plug (HExp t@(ICompose _ _ _) (hls,fhls)) i c | i `elem` hls = 
         do t' <- plugHoleI fillingToText t hls i c
            pure $ HExp t' (i `L.delete` hls,fhls)
-plugHole _ _ _ = Nothing
+plug _ _ _ = Nothing
 
 -- | Plugs every hole in an expression with no filled holes using the given plug
 -- function. If the plug function is defined for every hole in the input

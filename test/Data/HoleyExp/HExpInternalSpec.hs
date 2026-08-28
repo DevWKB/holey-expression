@@ -52,7 +52,7 @@ prop_identityCompose
     :: HExp Text Text
     -> Property
 prop_identityCompose t = property $ 
-    (empty +> t) == t && (t +> empty) == t
+    (emptyExp +> t) == t && (t +> emptyExp) == t
 
 testParseHExp :: Parser (HExp Text Text)
 testParseHExp = hExpParser

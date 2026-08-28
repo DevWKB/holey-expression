@@ -10,8 +10,6 @@ and ii. holes. The former correspond to chunks of "text" which we leave
 abstract, and the latter correspond to placeholders for values that will
 eventually be translated into "text".
 
-= The mathsy explanation
-
 Suppose we have a monoid \((\mathsf{Txt},\otimes,\mathsf{e})\), where we call
 elements of \(\mathsf{Txt}\) __text__. Furthermore, suppose we have a set
 \(\mathsf{Fill}\) which we call its elements __fillings__. 
@@ -74,15 +72,33 @@ the function:
 
 Each one of these concepts map to a corresponding item in this module.
 
-= The concrete explanation
+The holey expressions type, @exp :: t`HExp` text filling@, abstracts
+over \(\mathsf{Txt}\) and \(\mathsf{Fill}\) using type variables @text@ and
+@filling@. We enforce that @filling@ can be translated to @text@ using the type
+class @`HoleFilling` text filling@. This requires that there is a function 
+@`fillingToText` :: filling -> text@.
 
-Holey expressions, @exp :: `HExp` text filling@, correspond to a monoid in
-`text` where placeholders we call __holes__ can be replaced with a value we call
-a __filling__. This requires that there is a function 
-@`fillingToText` :: filling -> text@ that converts any @filling@ into a @text@.
-This is enforced by the type class @`HoleFilling` text filling@.
+There are three main combinators for creating holey expressions:
 
+1. @`chunk` :: text -> t`HExp` text filling@ is a piece of @text@ that
+sits between the holes in an expression;
+2. An empty hole, @`empty` :: t`GHC.Num.Natural` -> t`HExp` text filling@,
+   informally denoted @$i()@, simply corresponds to a natural number that acts as its index; and
+3. a filled hole, @`filled` :: t`GHC.Num.Natural` -> filling -> t`HExp` text filling@, are also indexed by a
+natural number, but now contain a filling that /may/ replace the hole when it's
+converted into a @text@.
+
+When @text@ is a monoid, then we can compose chunks and holes together using the
+sequential composition @`(+>)` :: t`HExp` text filling -> t`HExp` text filling
+-> t`HExp` text filling@. 
+
+Concrete examples are more interesting when we actually instantiate @text@ and
+@filling@. For several using t`Data.Text.Text` as the @text@, see
+"Data.HoleyExp.Text".
 -}
+
+
+
 module  Data.HoleyExp.HExp (-- * Holey Expressions 
                             HExp
                            ,TextLike(..)
@@ -117,7 +133,7 @@ module  Data.HoleyExp.HExp (-- * Holey Expressions
                             -- 
                             -- 1. Empty holes:
                             --
-                            -- >>> hole 1
+                            -- >>> empty 1
                             -- 
                             -- 2. Filled holes:
                             --
@@ -142,7 +158,7 @@ module  Data.HoleyExp.HExp (-- * Holey Expressions
                             --
                             -- for some expressions @e1,e2,...,ei@. This
                             -- composition is associative, but non-commutative.
-                           ,hole
+                           ,empty
                            ,filled
                            ,chunk
                            ,(+>)                                                      
@@ -152,13 +168,13 @@ module  Data.HoleyExp.HExp (-- * Holey Expressions
                            -- into the hole, but doesn't replace the hole. The
                            -- latter, replaces the hole altogether with the
                            -- value. There are two combinators for filling a
-                           -- hole: a destructive one @fillHole@, and a
-                           -- non-destructive one @placeInHole@. Finally,
+                           -- hole: a destructive one @update@, and a
+                           -- non-destructive one @place@. Finally,
                            -- @plugAll@ plugs every hole the function is defined for.
-                           ,plugHole
+                           ,plug
                            ,plugAll
-                           ,fillHole
-                           ,placeInHole
+                           ,update
+                           ,place
                            -- __* Hole Properties
                            ,unfilledHoles
                            ,filledHoles

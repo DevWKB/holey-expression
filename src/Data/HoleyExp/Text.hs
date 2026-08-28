@@ -9,11 +9,13 @@ Copyright   : (c) Harley Eades, 2026
               (c) W⋊B, 2026
 Maintainer  : harley.eades@gmail.com
 
-Holey expressions are essentially monoids with two types of elements "chunks of
-text" (constants) and "holes" (placeholders for constants). Then when all holes 
-are plugged in an expression it corresponds to a piece of text; here we are using 
-@text@ abstractly, and in fact, the base definition of t`HExp`'s is abstract in 
-both the type of text as well as the type of values you can fill holes with.
+This is the library for working with holey expressions in "Data.Text". 
+
+If you are new to this library, it is recommended to first read over the start
+of the base module "Data.HoleyExp.HExp" for an introduction to how holey
+expressions work. 
+
+Here we give a number of example holey-expressions.
 
 A simple example:
 
