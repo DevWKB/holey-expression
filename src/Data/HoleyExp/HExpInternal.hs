@@ -13,14 +13,12 @@ Maintainer  : harley.eades@gmail.com
 {-# LANGUAGE TypeFamilies                 #-}
 {-# LANGUAGE ScopedTypeVariables          #-}
 {-# LANGUAGE RankNTypes                   #-}
-{-# LANGUAGE TypeApplications             #-}
 {-# LANGUAGE BangPatterns                 #-}
 {-# LANGUAGE TupleSections                #-}
 {-# LANGUAGE PatternSynonyms              #-}
 {-# LANGUAGE MultiParamTypeClasses        #-}
 {-# LANGUAGE FlexibleInstances            #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
-{-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE FlexibleContexts #-}
 module Data.HoleyExp.HExpInternal where
 import Prelude                    hiding (null)
@@ -134,9 +132,12 @@ instance (TextLike text, HoleFilling text filling) => Show (HExp text filling) w
     show (HExp (ICompose prefix i rest) (emptyHoles, filledHoles))
         = (DT.unpack . toText $ prefix) 
         <> "$" <> show i <> "{"
-        <> (if i `elem` emptyHoles then "" else (DT.unpack . toText . (fillingToText @text) $ filledHoles ! i))
+        <> (if i `elem` emptyHoles then "" else (DT.unpack . toText . fToT $ filledHoles ! i))
         <> "}" 
         <> show (HExp rest (emptyHoles, filledHoles))
+        where
+            fToT :: filling -> text
+            fToT = fillingToText
 
 -- * Combinators
 

@@ -13,4 +13,4 @@ eventually be translated into "text".
 
 The API is well documented. Please see [hackage] for the complete documentation.
 
-[hackage]: https://hackage.haskell.org/package/holeyexpression
+[hackage]: https://hackage.haskell.org/package/holeyexp

@@ -9,7 +9,6 @@ Includes a generator for QuickCheck to randomly generate holey expressions to be
 used for property-based testing.
 -}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeAbstractions #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 module Test.QuickCheck.HExp
@@ -35,24 +34,23 @@ genChunk :: Arbitrary text => Gen (HExp text filling)
 genChunk = chunk <$> arbitrary
 
 genHoleFilling :: Arbitrary filling => Gen (Maybe filling)
-genHoleFilling @filling = sized $ \n -> 
+genHoleFilling = sized $ \n -> 
     frequency
         [ (1, pure Nothing),
-          (n, (arbitrary :: Gen filling) >>= (pure . Just))
+          (n, (arbitrary) >>= (pure . Just))
         ]
 
-genHExpNat :: (Arbitrary text, Arbitrary filling) => Natural -> Gen (HExp text filling)
+genHExpNat :: (Monoid text, Arbitrary text, Arbitrary filling) => Natural -> Gen (HExp text filling)
 genHExpNat 0 = genChunk
-genHExpNat @text n = do (HExp t holeProps) <- genHExpNat $ n - 1
-                        h <- arbitrary :: Gen Natural
-                        f <- genHoleFilling
-                        c <- arbitrary :: Gen text
-                        let t' = ICompose c h t                      
-                        pure $ HExp t' $ holeProps `updateFreshHolePropsWith` (h,f)
+genHExpNat n = do t <- genHExpNat $ n - 1
+                  h <- arbitrary :: Gen Natural
+                  f <- genHoleFilling
+                  c <- genChunk
+                  pure $ c <> (maybe (empty h) (filled h) f) <> t
 
-genHExp :: (Arbitrary text, Arbitrary filling) => Gen (HExp text filling)
+genHExp :: (Monoid text, Arbitrary text, Arbitrary filling) => Gen (HExp text filling)
 genHExp = arbitrary >>= genHExpNat 
 
-instance (Arbitrary text, Arbitrary filling) => Arbitrary (HExp text filling) where
+instance (Monoid text, Arbitrary text, Arbitrary filling) => Arbitrary (HExp text filling) where
     arbitrary :: Gen (HExp text filling)
     arbitrary = genHExp

@@ -1,4 +1,4 @@
-# Changelog for `holeyexpression`
+# Changelog for `holeyexp`
 
 All notable changes to this project will be documented in this file.
 
@@ -7,6 +7,12 @@ and this project adheres to the
 [Haskell Package Versioning Policy](https://pvp.haskell.org/).
 
 ## Unreleased
+## [0.3.0.0] - 2026-09-02
+### Changed
+    - Now builds with GHC 9.8.4. This required the removal of the 
+      TypeApplications extension in the Test.QuickCheck.HExp. In order to 
+      continue building we had to add new constraints to the genHExpNat, 
+      genHExp, and the Arbitrary instance for HExp.
 
 ## [0.2.0.0] - 2026-08-28
 ### Added
