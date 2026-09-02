@@ -12,3 +12,11 @@ d docs:
 
 cl clean:
 	stack clean --full
+
+hackage: 
+	rm -f dist-newstyle/*-docs.tar.gz
+	rm -f dist-newstyle/sdist/*.tar.gz
+	stack clean --full
+	cabal build
+	cabal sdist
+	cabal v2-haddock --haddock-for-hackage --enable-doc
