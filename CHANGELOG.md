@@ -7,6 +7,11 @@ and this project adheres to the
 [Haskell Package Versioning Policy](https://pvp.haskell.org/).
 
 ## Unreleased
+## [0.3.0.1] - 2026-09-04
+### Changed
+    - We migrated to the hole syntax `$i(f)` from `$i{f}`, but we forgot to 
+      migrate the parser combinators.
+
 ## [0.3.0.0] - 2026-09-02
 ### Changed
     - Now builds with GHC 9.8.4. This required the removal of the 

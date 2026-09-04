@@ -1,6 +1,6 @@
 cabal-version:  2.4
 name:           holeyexp
-version:        0.3.0.0
+version:        0.3.0.1
 license:        BSD-3-Clause
 license-file:   LICENSE.md
 maintainer:     Harley Eades III <harley.eades@gmail.com>
