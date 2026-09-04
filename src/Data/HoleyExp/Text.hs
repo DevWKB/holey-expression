@@ -135,7 +135,7 @@ instance HoleFilling Text Text where
 
             charTextFillingParser :: Parsec TParseError Text Char
             charTextFillingParser = choice [
-                    satisfy (\c -> c /= '{' && c /= '}' && c /= '\\'),
+                    satisfy (\c -> c /= '(' && c /= ')' && c /= '\\'),
                     escapeCharTextFillingParser
                 ]
 
@@ -220,11 +220,11 @@ holeFillingParser :: HoleFilling Text filling => Parser (Maybe filling)
 holeFillingParser = maybe n p (parseFilling @Text)
     where
         -- If there is no filling, then skip the braces.
-        n = (skip $ string "{}") >> pure Nothing
+        n = (skip $ string "()") >> pure Nothing
 
         p :: (Text -> Either Text filling) -> Parser (Maybe filling)
         p expParser = do
-            f <- MT.between (char '{') (char '}') $ many $ hExpCharParser True
+            f <- MT.between (char '(') (char ')') $ many $ hExpCharParser True
             if L.null f
             then pure Nothing 
             else do let e = expParser . DT.pack $ f
@@ -257,22 +257,22 @@ hExpParser = do
 
 -- | Parse an expression character. These are any unicode character where the
 -- characters 
--- > ["$","{","}","\\"] 
+-- > ["$","(",")","\\"] 
 -- are escaped when parsing a hole's filling,
 -- otherwise just @'$'@ needs to be escaped.
 hExpCharParser :: Bool -> Parser Char
 hExpCharParser filling = choice [
-        satisfy (\c -> c /= '$' && c /= '\'' && (if filling then c /= '{' && c /= '}' else True) && c /= '\\'),
+        satisfy (\c -> c /= '$' && c /= '\'' && (if filling then c /= '(' && c /= ')' else True) && c /= '\\'),
         escapedHExpCharParser
     ]
 
 -- | Parsed an escaped character; one of, 
--- > ["\\$"","\\{"","\\}","\\\\"]
+-- > ["\\$"","\\("","\\)","\\\\"]
 -- .
 escapedHExpCharParser :: Parser Char
 escapedHExpCharParser = do
     skipCount 1 (char '\\')
-    satisfy (\c -> c == '$' || c == '{' || c == '}' || c == '\'')
+    satisfy (\c -> c == '$' || c == '(' || c == ')' || c == '\'')
 
 -- * Helper parsers
 

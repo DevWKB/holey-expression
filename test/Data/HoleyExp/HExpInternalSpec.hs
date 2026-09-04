@@ -34,9 +34,9 @@ spec = do
             describe "Holes:" $ do
                 test_case "no index"                 test_parseFail1
                 test_case "negative index"           test_parseFail2
-                test_case "no opening brace"         test_parseFail3
-                test_case "no closing brace"         test_parseFail4
-                test_case "non-escaped curly brace"  test_parseFail5
+                test_case "no opening paren"         test_parseFail3
+                test_case "no closing paren"         test_parseFail4
+                test_case "non-escaped paren"        test_parseFail5
                 test_case "non-escaped backslash"    test_parseFail6
                 test_case "filling in unit hole"     test_parseFail7
 
@@ -62,42 +62,42 @@ testParseUnitHExp = hExpParser
 
 test_parseFail1 :: UnitTest (Maybe (HExp Text Text))
 test_parseFail1 = UnitTest {
-         test_result=parseTest testParseHExp "foo${a}"
+         test_result=parseTest testParseHExp "foo$(a)"
         ,test_output=Nothing
     }
 
 test_parseFail2 :: UnitTest (Maybe (HExp Text Text))
 test_parseFail2 = UnitTest {
-         test_result=parseTest testParseHExp "foo$-1{a}"
+         test_result=parseTest testParseHExp "foo$-1(a)"
         ,test_output=Nothing
     }
 
 test_parseFail3 :: UnitTest (Maybe (HExp Text Text))
 test_parseFail3 = UnitTest {
-         test_result=parseTest testParseHExp "foo$1a}bar"
+         test_result=parseTest testParseHExp "foo$1a)bar"
         ,test_output=Nothing
     }
 
 test_parseFail4 :: UnitTest (Maybe (HExp Text Text))
 test_parseFail4 = UnitTest {
-         test_result=parseTest testParseHExp "foo$1{abar"
+         test_result=parseTest testParseHExp "foo$1(abar"
         ,test_output=Nothing
     }
 
 test_parseFail5 :: UnitTest (Maybe (HExp Text Text))
 test_parseFail5 = UnitTest {
-         test_result=parseTest testParseHExp "foo$1{{a}bar"
+         test_result=parseTest testParseHExp "foo$1((a)bar"
         ,test_output=Nothing
     }
 
 test_parseFail6 :: UnitTest (Maybe (HExp Text Text))
 test_parseFail6 = UnitTest {
-         test_result=parseTest testParseHExp "foo$1{\\a}bar"
+         test_result=parseTest testParseHExp "foo$1(\\a)bar"
         ,test_output=Nothing
     }
 
 test_parseFail7 :: UnitTest (Maybe (HExp Text ()))
 test_parseFail7 = UnitTest {
-         test_result=parseTest testParseUnitHExp "foo$1{aa}bar"
+         test_result=parseTest testParseUnitHExp "foo$1(aa)bar"
         ,test_output=Nothing
     }
