@@ -7,6 +7,8 @@ and this project adheres to the
 [Haskell Package Versioning Policy](https://pvp.haskell.org/).
 
 ## Unreleased
+    - Exposed the hole pattern synonyms.
+    
 ## [0.3.0.1] - 2026-09-04
 ### Changed
     - We migrated to the hole syntax `$i(f)` from `$i{f}`, but we forgot to 

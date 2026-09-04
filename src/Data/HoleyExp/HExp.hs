@@ -123,6 +123,9 @@ module  Data.HoleyExp.HExp (-- * Holey Expressions
                            -- properties, if not then it's considered
                            -- undefined. This prevents a lot of boilerplate
                            -- pattern matching.
+                           ,pattern EmptyHole
+                           ,pattern FilledHole
+                           ,pattern UndefHole
                            ,pattern Empty
                            ,pattern Chunk
                            ,pattern Compose                           
