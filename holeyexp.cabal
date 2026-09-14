@@ -87,6 +87,7 @@ test-suite holey-expression-test
   other-modules:
       Paths_holeyexp
       Data.HoleyExp.HExpInternalSpec
+      Data.HoleyExp.TextSpec
       Test.QuickCheck.HExp
       Test.Helpers
   autogen-modules:
