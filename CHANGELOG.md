@@ -6,9 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to the
 [Haskell Package Versioning Policy](https://pvp.haskell.org/).
 
-## Unreleased
+## Unreleased    
+
+## [0.3.0.2] - 2026-09-10
+### Changed
     - Exposed the hole pattern synonyms.
-    
+    - Fixed the show instance for `HExp` to parens for holes instead of brackets.
+
 ## [0.3.0.1] - 2026-09-04
 ### Changed
     - We migrated to the hole syntax `$i(f)` from `$i{f}`, but we forgot to 

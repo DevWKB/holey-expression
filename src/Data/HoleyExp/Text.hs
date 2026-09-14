@@ -21,7 +21,7 @@ A simple example:
 
 >>> let t = (chunk "Today's Temperature: ") +> (hole 1) +> (chunk " high/") +> (hole 2) +> (chunk " low") :: HExp Text Double
 >>> t
-Today's Temperature: $1{} high/$2{} low
+Today's Temperature: $1() high/$2() low
 
 >>> plugAll t $ \_ -> \i -> if i == 1 then Just 91.2 else if i == 2 then Just 87.0 else Nothing 
 Just "Today's Temperature: 91.2 high/87.0 low"
@@ -40,7 +40,7 @@ True
 We can also add a filling to holes in an expression:
 
 >>> "Today's Temperature: " <> (filled 1 92.2) <> " high/" <> (filled 2 91.2) <> " low" :: HExp Text Double
-Today's Temperature: $1{92.2} high/$2{91.2} low
+Today's Temperature: $1(92.2) high/$2(91.2) low
 
 -}
 module Data.HoleyExp.Text

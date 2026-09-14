@@ -35,8 +35,8 @@ Let's consider a few abstract example expressions:
 1. \( t_1 * $(1,\mathsf{?}) * t_2 * $(2,\mathsf{?}) \), has chunks
    \(\{t_1,t_2\}\) and two empty holes indexed by \(1\) and \(2\).
 2. \( t_1 * $(5,f_5) * $(3,\mathsf{?}) * t_2 * $(7,f_7) \), has chunks
-   \(\{t_1,t_2\}\) and one empty holes indexed by \(3\) and a filled hole index
-   by \(7\) whose filling is \(f_2\).
+   \(\{t_1,t_2\}\) and one empty holes indexed by \(3\) and two filled holes index
+   by \(5\) whose filling is \(f_5\) and \(7\) whose filling is \(f_7\).
 
 Now if we choose some concrete sets for \(\mathsf{Txt}\) and \(\mathsf{Fill}\)
 then we can create more interesting expressions:
