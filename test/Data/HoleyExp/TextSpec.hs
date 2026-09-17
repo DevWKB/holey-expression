@@ -25,6 +25,7 @@ spec :: Spec
 spec = do
     describe "Unit Tests:" $ do
         test_case "example test case" test_example
+        test_case "second test case" second_test -- Add another case here
 
 testParseHExp :: Parser (HExp Text Text)
 testParseHExp = hExpParser
@@ -35,3 +36,9 @@ test_example = UnitTest {
         ,test_output=Nothing
     }
 
+{- Will define second test case here -}
+second_test :: UnitTest Bool
+secont_test = UnitTest {
+         test_output=True
+        ,test_result=False
+}
