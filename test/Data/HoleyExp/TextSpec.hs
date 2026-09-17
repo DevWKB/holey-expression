@@ -38,7 +38,7 @@ test_example = UnitTest {
 
 {- Will define second test case here -}
 second_test :: UnitTest Bool
-secont_test = UnitTest {
+second_test = UnitTest {
          test_output=True
-        ,test_result=False
+        ,test_result=True
 }
