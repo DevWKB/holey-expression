@@ -25,7 +25,8 @@ spec :: Spec
 spec = do
     describe "Unit Tests:" $ do
         test_case "example test case" test_example
-        test_case "second test case" second_test -- Add another case here
+        test_case "second test case" second_test
+        test_case "brace test" brace_test
 
 testParseHExp :: Parser (HExp Text Text)
 testParseHExp = hExpParser
@@ -36,9 +37,16 @@ test_example = UnitTest {
         ,test_output=Nothing
     }
 
-{- Will define second test case here -}
+{- Dummy test case -}
 second_test :: UnitTest Bool
 second_test = UnitTest {
          test_output=True
         ,test_result=True
+}
+
+{- Another unit test - Check if braces function works -}
+brace_test :: UnitTest Text
+brace_test = UnitTest {
+         test_output="{a}"
+        ,test_result=braces "a"
 }
