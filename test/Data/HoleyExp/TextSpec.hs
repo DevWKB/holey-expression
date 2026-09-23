@@ -9,6 +9,7 @@ Various properties of the holey-expressions API.
 -}
 module  Data.HoleyExp.TextSpec (spec) where
 
+import Data.Maybe (fromMaybe) -- Unsure if necessary, maybe this script already imports a helper that does the same thing.
 import Data.HoleyExp.HExpInternal
 import Data.HoleyExp.Text
 import Test.QuickCheck.HExp                ()
@@ -27,6 +28,8 @@ spec = do
         test_case "example test case" test_example
         test_case "second test case" second_test
         test_case "brace test" brace_test
+        -- test_case "empty hole" empty_hole_test
+        test_case "plug test" plug_test
 
 testParseHExp :: Parser (HExp Text Text)
 testParseHExp = hExpParser
@@ -49,4 +52,16 @@ brace_test :: UnitTest Text
 brace_test = UnitTest {
          test_output="{a}"
         ,test_result=braces "a"
+}
+
+empty_hole_test :: UnitTest (HExp Text Text)
+empty_hole_test = UnitTest {
+         test_output="Test is $1()"
+        ,test_result=(chunk "Test is ") +> (empty 1) :: HExp Text Text
+}
+
+plug_test :: UnitTest (HExp Text Text)
+plug_test = UnitTest {
+         test_output=(chunk "This is a test")
+        ,test_result=fromMaybe "" (plug ((chunk "This is a " ) +> (empty 1) :: HExp Text Text) 1 "test")
 }
