@@ -31,6 +31,7 @@ spec = do
         -- test_case "empty hole" empty_hole_test
         test_case "plug test" plug_test
         test_case "update replaces filling" update_fill
+        test_case "update removes filling" remove_fill
 
 testParseHExp :: Parser (HExp Text Text)
 testParseHExp = hExpParser
@@ -69,9 +70,16 @@ plug_test = UnitTest {
 }
 
 {- Update on Filled Hole -}
-update_fill :: UnitTest (Maybe(HExp Text Text))
+update_fill :: UnitTest (Maybe (HExp Text Text))
 update_fill = UnitTest {
          test_output=Just ((chunk "Name: ") +> (filled 1 "Hyde"))
         ,test_result=update ((chunk "Name: ") +> (filled 1 "Jekyll")) 1 (Just "Hyde")
 
+}
+
+{- Empty a filled hole -}
+remove_fill :: UnitTest (Maybe (HExp Text Text))
+remove_fill = UnitTest {
+         test_output=Just ((chunk "This ") +> (empty 1) +> (chunk " is missing."))
+        ,test_result=update ((chunk "This ") +> (filled 1 "word") +> (chunk" is missing.")) 1 Nothing
 }
