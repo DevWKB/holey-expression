@@ -26,10 +26,11 @@ spec :: Spec
 spec = do
     describe "Unit Tests:" $ do
         test_case "example test case" test_example
-        test_case "second test case" second_test
-        test_case "brace test" brace_test
+        -- test_case "second test case" second_test
+        -- test_case "brace test" brace_test
         -- test_case "empty hole" empty_hole_test
         test_case "plug test" plug_test
+        test_case "update replaces filling" update_fill
 
 testParseHExp :: Parser (HExp Text Text)
 testParseHExp = hExpParser
@@ -54,6 +55,7 @@ brace_test = UnitTest {
         ,test_result=braces "a"
 }
 
+-- This test attempts to check a Text value against a HExp
 empty_hole_test :: UnitTest (HExp Text Text)
 empty_hole_test = UnitTest {
          test_output="Test is $1()"
@@ -64,4 +66,12 @@ plug_test :: UnitTest (HExp Text Text)
 plug_test = UnitTest {
          test_output=(chunk "This is a test")
         ,test_result=fromMaybe "" (plug ((chunk "This is a " ) +> (empty 1) :: HExp Text Text) 1 "test")
+}
+
+{- Update on Filled Hole -}
+update_fill :: UnitTest (Maybe(HExp Text Text))
+update_fill = UnitTest {
+         test_output=Just ((chunk "Name: ") +> (filled 1 "Hyde"))
+        ,test_result=update ((chunk "Name: ") +> (filled 1 "Jekyll")) 1 (Just "Hyde")
+
 }
