@@ -210,7 +210,7 @@ instance (Eq text, Eq filling) => Eq (HExp text filling) where
     (==) = (==>)
 
 -- | Equality of holey expressions. Two holey expressions are considered equivalent if and only
--- if they differ by hole labels only. The contents of filled holes are included
+-- if they differ by hole indices only. The contents of filled holes are included
 -- in the decision.
 (==>) :: (Eq text,Eq filling)
       => HExp text filling
