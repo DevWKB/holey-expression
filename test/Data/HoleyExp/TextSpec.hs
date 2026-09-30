@@ -32,6 +32,13 @@ spec = do
         test_case "plug test" plug_test
         test_case "update replaces filling" update_fill
         test_case "update removes filling" remove_fill
+        
+    describe "HExp Equality Tests: " $ do
+        test_case "eq on different # holes" eq_hole_miscount
+
+
+    describe "HExp Partial Equality Tests: " $ do
+        test_case "partial eq on different # holes" part_eq_hole_miscount
 
 testParseHExp :: Parser (HExp Text Text)
 testParseHExp = hExpParser
@@ -82,4 +89,28 @@ remove_fill :: UnitTest (Maybe (HExp Text Text))
 remove_fill = UnitTest {
          test_output=Just ((chunk "This ") +> (empty 1) +> (chunk " is missing."))
         ,test_result=update ((chunk "This ") +> (filled 1 "word") +> (chunk" is missing.")) 1 Nothing
+}
+
+{- 
+HExp Equality Cases 
+        1. Different # holes --> Not equal
+        2. Same # holes, mismatched fill parity --> Not equal
+        3. Same # holes, matching fill parity, matching indices, matching fillings --> Equal
+        4. Same # holes, matching fill parity, matching indices, mismatched fillings --> Partially equal
+        5. Same # holes, matching fill parity, mismatching indices, matching fillings, > 1 empty hole --> Not equal
+        6. Same # holes, matching fill parity, mismatching indices, matching fillings, all holes filled --> Partially equal
+-}
+
+{- HExp Eq Case 1-}
+eq_hole_miscount :: UnitTest (Bool)
+eq_hole_miscount = UnitTest {
+         test_output=False
+        ,test_result=(==>) ((chunk "This ") +> (empty 1) +> (chunk " and that ") :: HExp Text Text) ((chunk "This ") +> (empty 1) +> (chunk " and that ") +> (empty 2) :: HExp Text Text)
+}
+
+{- HExp Partial Eq Case 1-}
+part_eq_hole_miscount :: UnitTest (Bool)
+part_eq_hole_miscount = UnitTest {
+         test_output=False
+        ,test_result=(=->) ((chunk "This ") +> (empty 1) +> (chunk " and that ") :: HExp Text Text) ((chunk "This ") +> (empty 1) +> (chunk " and that ") +> (empty 2) :: HExp Text Text)
 }
