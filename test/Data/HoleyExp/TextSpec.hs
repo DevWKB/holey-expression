@@ -33,12 +33,12 @@ spec = do
         test_case "update replaces filling" update_fill
         test_case "update removes filling" remove_fill
         
-    describe "HExp Equality Tests: " $ do
-        test_case "eq on different # holes" eq_hole_miscount
+    describe "HExp Equality (==>) Tests: " $ do
+        test_case "eq (==>) on different # holes" eq_hole_miscount
 
 
-    describe "HExp Partial Equality Tests: " $ do
-        test_case "partial eq on different # holes" part_eq_hole_miscount
+    describe "HExp Equality (=->) Tests: " $ do
+        test_case "eq (=->) on different # holes" eq2_hole_miscount
 
 testParseHExp :: Parser (HExp Text Text)
 testParseHExp = hExpParser
@@ -108,9 +108,9 @@ eq_hole_miscount = UnitTest {
         ,test_result=(==>) ((chunk "This ") +> (empty 1) +> (chunk " and that ") :: HExp Text Text) ((chunk "This ") +> (empty 1) +> (chunk " and that ") +> (empty 2) :: HExp Text Text)
 }
 
-{- HExp Partial Eq Case 1-}
-part_eq_hole_miscount :: UnitTest (Bool)
-part_eq_hole_miscount = UnitTest {
+{- HExp Eq2 Case 1-}
+eq2_hole_miscount :: UnitTest (Bool)
+eq2_hole_miscount = UnitTest {
          test_output=False
         ,test_result=(=->) ((chunk "This ") +> (empty 1) +> (chunk " and that ") :: HExp Text Text) ((chunk "This ") +> (empty 1) +> (chunk " and that ") +> (empty 2) :: HExp Text Text)
 }

@@ -210,16 +210,16 @@ instance (Eq text, Eq filling) => Eq (HExp text filling) where
     (==) = (==>)
 
 -- | Equality of holey expressions. Two holey expressions are considered equivalent if and only
--- if each hole of one holey expression matches the index and filling content of 
--- exactly one hole of the other holey expression.
+-- if they differ by hole labels only. The contents of filled holes are included
+-- in the decision.
 (==>) :: (Eq text,Eq filling)
       => HExp text filling
       -> HExp text filling
       -> Bool
 (HExp t1 (hls1,fhls1)) ==> (HExp t2 (hls2,fhls2)) = t1 >==> t2 && hls1 == hls2 && fhls1 == fhls2
 
--- | Partial equality of holey expressions. Two holey expressions are considered partially equivalent if
--- and only if they differ by no more than hole indices. The contents of filled holes are not included
+-- | Equality of holey expressions. Two holey expressions are considered equivalent if and only
+-- if they differ by hole indices only. The contents of filled holes are not included
 -- in the decision.
 (=->) :: (Eq text)
       => HExp text filling

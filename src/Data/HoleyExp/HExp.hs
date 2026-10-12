@@ -185,6 +185,7 @@ module  Data.HoleyExp.HExp (-- * Holey Expressions
                            ,numberOfFilledHoles
                            -- __* Equality
                            ,(==>)
+                           ,(=->)
                            -- __* Useful Helpers
                            ,showAST
                            ,sepHExpsBy
