@@ -5,6 +5,7 @@ Copyright   : (c) Harley Eades, 2026
               (c) W⋊B, 2026
 Maintainer  : harley.eades@gmail.com
 -}
+
 {-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE PatternSynonyms              #-}
 {-# LANGUAGE DataKinds                    #-}
@@ -36,39 +37,40 @@ import Data.NatMap                (NatMap
                                   ,delete
                                   ,singleton)
 import Data.NatMap                qualified as M
+import Data.List.NonEmpty         qualified as NE
 
 -- | Holes are either empty or filled; thus, a hole's properties consists of a
 -- pair of a list of natural numbers designating the set of empty holes and a
 -- natural-number map (t'NatMap') that assigns fillings of type @f@ to hole
 -- indices.
-type HoleProps f = ([Natural],NatMap f)
+type HoleProps f = (NE.NonEmpty Natural,NatMap f)
 
 -- | A hole that can be filled with a filling of type @f@ is a natural number
 -- and a set of hole properties (t`HoleProps`).
-type Hole f      = (Natural,HoleProps f)
+type Hole f      = (NE.NonEmpty Natural,HoleProps f)
 
 -- ** Hole Patterns
 
 -- | Pattern synonym for empty holes. 
-pattern EmptyHole :: Natural -> HoleProps f -> Hole f
+pattern EmptyHole ::NE.NonEmpty Natural -> HoleProps f -> Hole f
 pattern EmptyHole i hlsProps <- (decomposeEmptyHole -> Just (i,hlsProps))
 
 -- | Pattern synonym for filled holes.
-pattern FilledHole :: Natural -> f -> HoleProps f -> Hole f
+pattern FilledHole :: NE.NonEmpty Natural -> f -> HoleProps f -> Hole f
 pattern FilledHole i f hlsProps <- (decomposeFilledHole -> Just (i,Just f,hlsProps))
 
 -- | Pattern synonym for undefined holes. These are holes which are not currently used
 -- in the expression; and thus, are neither free nor empty.
-pattern UndefHole :: Natural -> HoleProps f -> Hole f
+pattern UndefHole :: NE.NonEmpty Natural -> HoleProps f -> Hole f
 pattern UndefHole i hlsProps <- (decomposeUndefHole -> Just (i,hlsProps))
 
 -- | Determines if the input hole index @i@ is the index of an empty hole.
-decomposeEmptyHole :: (Natural, HoleProps f) -> Maybe (Natural, HoleProps f)
+decomposeEmptyHole :: (NE.NonEmpty Natural, HoleProps f) -> Maybe (NE.NonEmpty Natural, HoleProps f)
 decomposeEmptyHole h@(i,hlsProps) | emptyHole i hlsProps = Just h
                                   | otherwise = Nothing
 
 -- | Determines if the input hole index @i@ is the index of a filled hole.
-decomposeFilledHole :: Hole f -> Maybe (Natural, Maybe f, HoleProps f)
+decomposeFilledHole :: Hole f -> Maybe (NE.NonEmpty Natural, Maybe f, HoleProps f)
 decomposeFilledHole (i,hlsProps@(_,fhls)) | filledHole i hlsProps = Just (i,fhls !? i,hlsProps)
                                           | otherwise             = Nothing
 
@@ -81,7 +83,7 @@ decomposeUndefHole h | isNothing (decomposeEmptyHole h) && isNothing (decomposeF
 {-# COMPLETE EmptyHole, FilledHole, UndefHole #-}
 
 -- | Tests to see if a hole index exist in the given hole properties.
-isFreshHoleIndex :: Natural     -- ^ Hole index
+isFreshHoleIndex :: NE.NonEmpty Natural     -- ^ Hole index
                  -> HoleProps f -- ^ Hole properties
                  -> Bool
 isFreshHoleIndex h holeProps = not $ filledHole h holeProps || emptyHole h holeProps
@@ -89,8 +91,11 @@ isFreshHoleIndex h holeProps = not $ filledHole h holeProps || emptyHole h holeP
 -- | Decides if the given hole index is empty with respect to the given hole
 -- properties. This returns `True` when the given index is in the set of
 -- empty holes, but is not defined in the map of filled holes.
-emptyHole :: Natural -> HoleProps f -> Bool
+emptyHole :: NE.NonEmpty Natural -> HoleProps f -> Bool
 emptyHole i (hls,fhls) = i `elem` hls && not (i `elem` keys fhls)
+
+{- *** Beginning of "comment-out" block for testing
+
 
 -- | Decides if the given hole index is filled with respect to the given hole
 -- properties. This returns `True` when the given index is not in the set of
@@ -217,6 +222,15 @@ instance (Eq text, Eq filling) => Eq (HExp text filling) where
       -> HExp text filling
       -> Bool
 (HExp t1 (hls1,fhls1)) ==> (HExp t2 (hls2,fhls2)) = t1 >==> t2 && hls1 == hls2 && fhls1 == fhls2
+
+-- | Equality of holey expressions. Two holey expressions are considered equivalent if and only
+-- if they differ by hole indices only. The contents of filled holes are not included
+-- in the decision.
+(=->) :: (Eq text)
+      => HExp text filling
+      -> HExp text filling
+      -> Bool
+(HExp t1 (hls1,_)) =-> (HExp t2 (hls2,_)) = t1 >==> t2 && hls1 == hls2
 
 -- | An empty hole.
 empty :: Monoid text
@@ -514,3 +528,5 @@ betweenHExp :: (ToHExp text filling a)
             -> a                     -- ^ Value to be converted into an expression
             -> HExp text filling
 betweenHExp b a (toHExp->t) = b +> t +> a
+
+   *** End of "comment-out" block for testing -}
