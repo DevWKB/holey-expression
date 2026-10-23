@@ -36,6 +36,7 @@ import Data.NatMap                (NatMap
                                   ,delete
                                   ,singleton)
 import Data.NatMap                qualified as M
+import Data.List.NonEmpty         qualified as NE
 
 -- | Holes are either empty or filled; thus, a hole's properties consists of a
 -- pair of a list of natural numbers designating the set of empty holes and a
@@ -158,21 +159,21 @@ pattern Chunk s <- (isChunk -> Just s)
         Chunk = chunk
 
 -- | Pattern synonym for the composition of holey expressions.
-pattern Compose :: Monoid text => text -> (Natural,Maybe filling) -> HExp text filling -> HExp text filling
-pattern Compose c h t <- (decompose -> Just (c, h, t))
-    where
-        Compose = compose
+-- pattern Compose :: Monoid text => text -> (Natural,Maybe filling) -> HExp text filling -> HExp text filling
+-- pattern Compose c h t <- (decompose -> Just (c, h, t))
+    -- where
+        -- Compose = compose
 
-{-# COMPLETE Chunk, Compose #-}
+-- {-# COMPLETE Chunk, Compose #-}
 
 -- | Explicitly create a top-level composition expression.
-compose :: Monoid text
-        => text                   -- ^ Prefix chunk
-        -> (Natural,Maybe filling)           
-        -> HExp text filling  -- ^ HExp branch
-        -> HExp text filling
-compose c (i, Nothing) t = chunk c +> empty i     +> t
-compose c (i, Just f)  t = chunk c +> filled i f +> t
+-- compose :: Monoid text
+        -- => text                   -- ^ Prefix chunk
+        -- -> (NE.NonEmpty Natural,Maybe filling)           
+        -- -> HExp text filling  -- ^ HExp branch
+        -- -> HExp text filling
+-- compose c (i, Nothing) t = chunk c +> empty i     +> t
+-- compose c (i, Just f)  t = chunk c +> filled i f +> t
 
 -- | Decompose an expression into the top-level compose.
 decompose :: HExp text filling 
