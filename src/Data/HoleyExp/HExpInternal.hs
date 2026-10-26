@@ -149,7 +149,7 @@ pattern Empty <- (null -> True) where
 
 -- | Decides if an expression corresponds to a chunk or not. 
 isChunk :: HExp text filling -> Maybe text
-isChunk (HExp (IChunk s) ([],m)) | M.null m = Just s
+-- isChunk (HExp (IChunk s) ([],m)) | M.null m = Just s
 isChunk _ = Nothing
 
 -- | Pattern synonym for expression chunk's.
