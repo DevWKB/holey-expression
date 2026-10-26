@@ -167,13 +167,13 @@ pattern Compose c h t <- (decompose -> Just (c, h, t))
 {-# COMPLETE Chunk, Compose #-}
 
 -- | Explicitly create a top-level composition expression.
-compose :: Monoid text
-        => text                   -- ^ Prefix chunk
-        -> (Natural,Maybe filling)           
-        -> HExp text filling  -- ^ HExp branch
-        -> HExp text filling
+-- compose :: Monoid text
+--         => text                   -- ^ Prefix chunk
+--         -> (Natural,Maybe filling)           
+--         -> HExp text filling  -- ^ HExp branch
+--         -> HExp text filling
 -- compose c (i, Nothing) t = chunk c +> empty i     +> t
-compose c (i, Just f)  t = chunk c +> filled i f +> t
+-- compose c (i, Just f)  t = chunk c +> filled i f +> t
 
 -- | Decompose an expression into the top-level compose.
 decompose :: HExp text filling 
