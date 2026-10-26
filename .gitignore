@@ -3,3 +3,4 @@ megaparsec
 report.html
 dist-newstyle
 Dockerfile
+*.code-workspace

@@ -42,7 +42,7 @@ import Data.List.NonEmpty         qualified as NE
 -- pair of a list of natural numbers designating the set of empty holes and a
 -- natural-number map (t'NatMap') that assigns fillings of type @f@ to hole
 -- indices.
-type HoleProps f = ([Natural],NatMap f)
+type HoleProps f = (NE.NonEmpty Natural,NatMap f)
 
 -- | A hole that can be filled with a filling of type @f@ is a natural number
 -- and a set of hole properties (t`HoleProps`).
@@ -159,21 +159,21 @@ pattern Chunk s <- (isChunk -> Just s)
         Chunk = chunk
 
 -- | Pattern synonym for the composition of holey expressions.
--- pattern Compose :: Monoid text => text -> (Natural,Maybe filling) -> HExp text filling -> HExp text filling
--- pattern Compose c h t <- (decompose -> Just (c, h, t))
-    -- where
-        -- Compose = compose
+pattern Compose :: Monoid text => text -> (Natural,Maybe filling) -> HExp text filling -> HExp text filling
+pattern Compose c h t <- (decompose -> Just (c, h, t))
+    where
+        Compose = compose
 
--- {-# COMPLETE Chunk, Compose #-}
+{-# COMPLETE Chunk, Compose #-}
 
 -- | Explicitly create a top-level composition expression.
--- compose :: Monoid text
-        -- => text                   -- ^ Prefix chunk
-        -- -> (NE.NonEmpty Natural,Maybe filling)           
-        -- -> HExp text filling  -- ^ HExp branch
-        -- -> HExp text filling
--- compose c (i, Nothing) t = chunk c +> empty i     +> t
--- compose c (i, Just f)  t = chunk c +> filled i f +> t
+compose :: Monoid text
+        => text                   -- ^ Prefix chunk
+        -> (Natural,Maybe filling)           
+        -> HExp text filling  -- ^ HExp branch
+        -> HExp text filling
+compose c (i, Nothing) t = chunk c +> empty i     +> t
+compose c (i, Just f)  t = chunk c +> filled i f +> t
 
 -- | Decompose an expression into the top-level compose.
 decompose :: HExp text filling 
@@ -211,13 +211,22 @@ instance (Eq text, Eq filling) => Eq (HExp text filling) where
     (==) = (==>)
 
 -- | Equality of holey expressions. Two holey expressions are considered equivalent if and only
--- if they differ by hole labels only. The contents of filled holes are included
--- in the decision.
+-- if each hole of one holey expression matches the index and filling content of 
+-- exactly one hole of the other holey expression.
 (==>) :: (Eq text,Eq filling)
       => HExp text filling
       -> HExp text filling
       -> Bool
 (HExp t1 (hls1,fhls1)) ==> (HExp t2 (hls2,fhls2)) = t1 >==> t2 && hls1 == hls2 && fhls1 == fhls2
+
+-- | Partial equality of holey expressions. Two holey expressions are considered partially equivalent if
+-- and only if they differ by no more than hole indices. The contents of filled holes are not included
+-- in the decision.
+(=->) :: (Eq text)
+      => HExp text filling
+      -> HExp text filling
+      -> Bool
+(HExp t1 (hls1,_)) =-> (HExp t2 (hls2,_)) = t1 >==> t2 && hls1 == hls2
 
 -- | An empty hole.
 empty :: Monoid text
