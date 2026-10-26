@@ -235,12 +235,12 @@ instance (Eq text, Eq filling) => Eq (HExp text filling) where
 -- empty i = flip HExp ([i],M.empty) $ ICompose mempty i (IChunk mempty)
 
 -- | A hole with a filling. 
-filled :: Monoid text
-       => Natural -- ^ Hole index
-       -> filling -- ^ Hole filling
-       -> HExp text filling
-filled i f 
-    = flip HExp ([],singleton i f) $ (ICompose mempty i (IChunk mempty))
+-- filled :: Monoid text
+--        => Natural -- ^ Hole index
+--        -> filling -- ^ Hole filling
+--        -> HExp text filling
+-- filled i f 
+    -- = flip HExp ([],singleton i f) $ (ICompose mempty i (IChunk mempty))
 
 -- | A chunk is a constant; it's helpful to think of these as a piece of
 -- subtext. 
