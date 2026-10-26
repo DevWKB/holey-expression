@@ -100,8 +100,8 @@ filledHole :: Natural -> HoleProps f -> Bool
 filledHole i (hls,fhls) = not (i `elem` hls) && i `elem` keys fhls
 
 -- | The hole properties with no defined holes.
-emptyHoleProps :: HoleProps f
-emptyHoleProps = ([], M.empty)
+-- emptyHoleProps :: HoleProps f
+-- emptyHoleProps = ([], M.empty)
 
 -- | Adds a hole index and potential filling to the given hole properties. If
 -- the given filling is @Nothing@ then the hole is assumed to be added as an
