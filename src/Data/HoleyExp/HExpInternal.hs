@@ -159,12 +159,12 @@ pattern Chunk s <- (isChunk -> Just s)
         Chunk = chunk
 
 -- | Pattern synonym for the composition of holey expressions.
-pattern Compose :: Monoid text => text -> (Natural,Maybe filling) -> HExp text filling -> HExp text filling
-pattern Compose c h t <- (decompose -> Just (c, h, t))
-    where
-        Compose = compose
+-- pattern Compose :: Monoid text => text -> (Natural,Maybe filling) -> HExp text filling -> HExp text filling
+-- pattern Compose c h t <- (decompose -> Just (c, h, t))
+--     where
+--         Compose = compose
 
-{-# COMPLETE Chunk, Compose #-}
+-- {-# COMPLETE Chunk, Compose #-}
 
 -- | Explicitly create a top-level composition expression.
 -- compose :: Monoid text
