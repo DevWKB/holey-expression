@@ -249,9 +249,9 @@ instance (Eq text, Eq filling) => Eq (HExp text filling) where
 -- chunk = flip HExp ([],M.empty) .  IChunk
 
 -- | The empty expression.
-emptyExp :: Monoid text 
-         => HExp text filling
-emptyExp = chunk mempty
+-- emptyExp :: Monoid text 
+--          => HExp text filling
+-- emptyExp = chunk mempty
 
 -- | Composition of `IHExp`.
 (>+>) :: Semigroup text
