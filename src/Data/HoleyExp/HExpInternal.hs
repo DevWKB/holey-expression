@@ -36,7 +36,8 @@ import Data.NatMap                (NatMap
                                   ,delete
                                   ,singleton)
 import Data.NatMap                qualified as M
-import Data.List.NonEmpty (NonEmpty)
+import Data.List.NonEmpty         (NonEmpty (..))
+import Data.List.NonEmpty         qualified as NL
 
 -- | Holes are either empty or filled; thus, a hole's properties consists of a
 -- pair of a list of natural numbers designating the set of empty holes and a
@@ -119,6 +120,7 @@ updateFreshHolePropsWith holeProps             (_,_)                            
 data IHExp text where
     IChunk   :: text -> IHExp text
     ICompose :: text -> NonEmpty Natural -> IHExp text -> IHExp text
+    deriving Show
 
 -- | An expression with pluggable holes. We do not expose the underlying
 -- constructors in favor of the combinators.
@@ -159,7 +161,7 @@ pattern Chunk s <- (isChunk -> Just s)
         Chunk = chunk
 
 -- | Pattern synonym for the composition of holey expressions.
-pattern Compose :: Monoid text => text -> (Natural,Maybe filling) -> HExp text filling -> HExp text filling
+pattern Compose :: (Monoid text, Eq text) => text -> (Natural,Maybe filling) -> HExp text filling -> HExp text filling
 pattern Compose c h t <- (decompose -> Just (c, h, t))
     where
         Compose = compose
@@ -167,7 +169,7 @@ pattern Compose c h t <- (decompose -> Just (c, h, t))
 {-# COMPLETE Chunk, Compose #-}
 
 -- | Explicitly create a top-level composition expression.
-compose :: Monoid text
+compose :: (Monoid text, Eq text)
         => text                   -- ^ Prefix chunk
         -> (Natural,Maybe filling)           
         -> HExp text filling  -- ^ HExp branch
@@ -244,28 +246,42 @@ emptyExp :: Monoid text
          => HExp text filling
 emptyExp = chunk mempty
 
+isEmpHoleIndexList :: HoleProps f -> NonEmpty Natural -> Bool
+isEmpHoleIndexList (emptyHoles,_) (i :| l) | i `elem` emptyHoles = foldl (\acc j -> j `elem` emptyHoles && acc) True l
+                                           | otherwise = False
+                                                     
+
 -- | Composition of `IHExp`.
-(>+>) :: Semigroup text
+(>+>) :: (Monoid text, Eq text)
       => IHExp text 
       -> IHExp text 
+      -> HoleProps f
       -> IHExp text 
-(IChunk chk1)    >+> (IChunk chk2)    = IChunk $ chk1 <> chk2
-(IChunk chk)     >+> (ICompose p h r) = ICompose (chk <> p) h r
-(ICompose p h r) >+> t                = ICompose p h $ r >+> t
+(>+>) (IChunk chk1) (IChunk chk2) _   
+    = IChunk $ chk1 <> chk2
+(>+>) (IChunk chk)  (ICompose p h r) _ 
+    = ICompose (chk <> p) h r
+(>+>) (ICompose p h r) t hprops 
+    = case r >+> t $ hprops of
+        ICompose p' h' t' | p' == mempty && isEmpHoleIndexList hprops h 
+                                         && isEmpHoleIndexList hprops h' 
+                         -> ICompose p (NL.append h h') t'
+        exp -> ICompose p h exp
 
 -- | Composition of holey expressions.
-(+>) :: Semigroup text 
+(+>) :: (Monoid text, Eq text )
      => HExp text filling
      -> HExp text filling
      -> HExp text filling
 (HExp t1 (ufhs1,fhs1)) +> (HExp t2 (ufhs2,fhs2)) 
-    = HExp (t1 >+> t2) (ufhs1 `L.union` ufhs2,fhs1 `M.union` fhs2) 
+    = let hprops = (ufhs1 `L.union` ufhs2,fhs1 `M.union` fhs2)  
+       in HExp (t1 >+> t2 $ hprops) hprops
 
-instance Semigroup text => Semigroup (HExp text filling) where
+instance (Monoid text, Eq text) => Semigroup (HExp text filling) where
     (<>) :: HExp text filling -> HExp text filling -> HExp text filling
     (<>) = (+>)
 
-instance Monoid text => Monoid (HExp text filling) where
+instance (Monoid text, Eq text) => Monoid (HExp text filling) where
     mempty :: HExp text filling
     mempty = emptyExp
 
@@ -459,7 +475,7 @@ plugAll _ _ = Nothing
 -- into @filling@ can be declared as well. This makes it easier to plug a custom
 -- parser in for @text@ making use of the existing parsers for the various
 -- instances of t`HExp`.
-class (Monoid text,Eq filling) => HoleFilling text filling  where    
+class (Monoid text,Eq text,Eq filling) => HoleFilling text filling  where    
     fillingToText :: filling -> text    
 
     parseFilling :: Maybe (Text -> Either Text filling)
@@ -495,7 +511,7 @@ instance (ToHExp text filling a) => ToHExp text filling (Either (HExp text filli
     toHExp (Left t)  = t
     toHExp (Right a) = toHExp a
 
-instance Monoid text => HoleFilling text () where
+instance (Monoid text, Eq text) => HoleFilling text () where
     fillingToText :: () -> text
     fillingToText () = mempty
 
