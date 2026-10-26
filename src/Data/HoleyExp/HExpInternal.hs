@@ -194,7 +194,7 @@ isUnit m | m == mempty = True
 
 -- | Test to see if an expression is empty.
 null :: (Eq text, Monoid text) => HExp text filling -> Bool
-null (HExp (IChunk c) ([],m)) | isUnit c && M.null m = True
+-- null (HExp (IChunk c) ([],m)) | isUnit c && M.null m = True
 null _ = False
 
 -- | Equality of t`IHExp`. Holes are ignored.
