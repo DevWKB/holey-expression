@@ -153,10 +153,10 @@ isChunk :: HExp text filling -> Maybe text
 isChunk _ = Nothing
 
 -- | Pattern synonym for expression chunk's.
-pattern Chunk :: text -> HExp text filling
-pattern Chunk s <- (isChunk -> Just s)
-    where
-        Chunk = chunk
+-- pattern Chunk :: text -> HExp text filling
+-- pattern Chunk s <- (isChunk -> Just s)
+--     where
+        -- Chunk = chunk
 
 -- | Pattern synonym for the composition of holey expressions.
 -- pattern Compose :: Monoid text => text -> (Natural,Maybe filling) -> HExp text filling -> HExp text filling
