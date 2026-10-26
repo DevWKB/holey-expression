@@ -244,9 +244,9 @@ instance (Eq text, Eq filling) => Eq (HExp text filling) where
 
 -- | A chunk is a constant; it's helpful to think of these as a piece of
 -- subtext. 
-chunk :: text -- ^ Constant
-      -> HExp text filling
-chunk = flip HExp ([],M.empty) .  IChunk
+-- chunk :: text -- ^ Constant
+    --   -> HExp text filling
+-- chunk = flip HExp ([],M.empty) .  IChunk
 
 -- | The empty expression.
 emptyExp :: Monoid text 
