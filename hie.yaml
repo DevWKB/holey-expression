@@ -1,7 +1,7 @@
 cradle:
-  stack:
-    - path: "./src"
-      component: "holey-expression:lib"
+  cabal:
+    - path: "src"
+      component: "lib:holeyexp"
 
-    - path: "./test"
-      component: "holey-expression:test:holey-expression-test"
+    - path: "test"
+      component: "holeyexp:test:holey-expression-test"

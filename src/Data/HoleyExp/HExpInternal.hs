@@ -36,6 +36,7 @@ import Data.NatMap                (NatMap
                                   ,delete
                                   ,singleton)
 import Data.NatMap                qualified as M
+import Data.List.NonEmpty (NonEmpty)
 
 -- | Holes are either empty or filled; thus, a hole's properties consists of a
 -- pair of a list of natural numbers designating the set of empty holes and a
@@ -117,7 +118,7 @@ updateFreshHolePropsWith holeProps             (_,_)                            
 -- | The underlying structure of t'HExp'.
 data IHExp text where
     IChunk   :: text -> IHExp text
-    ICompose :: text -> Natural -> IHExp text -> IHExp text
+    ICompose :: text -> NonEmpty Natural -> IHExp text -> IHExp text
 
 -- | An expression with pluggable holes. We do not expose the underlying
 -- constructors in favor of the combinators.
@@ -132,7 +133,7 @@ instance (TextLike text, HoleFilling text filling) => Show (HExp text filling) w
     show (HExp (ICompose prefix i rest) (emptyHoles, filledHoles))
         = (DT.unpack . toText $ prefix) 
         <> "$" <> show i <> "("
-        <> (if i `elem` emptyHoles then "" else (DT.unpack . toText . fToT $ filledHoles ! i))
+        <> undefined -- (if i `elem` emptyHoles then "" else (DT.unpack . toText . fToT $ filledHoles ! i))
         <> ")" 
         <> show (HExp rest (emptyHoles, filledHoles))
         where
@@ -177,11 +178,11 @@ compose c (i, Just f)  t = chunk c +> filled i f +> t
 -- | Decompose an expression into the top-level compose.
 decompose :: HExp text filling 
           -> Maybe (text, (Natural,Maybe filling), HExp text filling)
-decompose (HExp (ICompose c i t') hlsProps) =     
-     case (i,hlsProps) of
+decompose (HExp (ICompose c i t') hlsProps) = undefined  
+     {-case (i,hlsProps) of
         (EmptyHole _ (uh,fh))    -> Just (c, (i,Nothing), HExp t' (i `L.delete` uh,fh))
         (FilledHole _ f (uh,fh)) -> Just (c, (i,Just f),  HExp t' (uh,i `delete` fh))
-        (UndefHole  _ _)         -> Nothing
+        (UndefHole  _ _)         -> Nothing -}
 decompose _ = Nothing
 
 -- | Decide if an element of a monoid is the unit.
@@ -222,7 +223,7 @@ instance (Eq text, Eq filling) => Eq (HExp text filling) where
 empty :: Monoid text
      => Natural -- ^ Hole index
      -> HExp text filling
-empty i = flip HExp ([i],M.empty) $ ICompose mempty i (IChunk mempty)
+empty i = flip HExp ([i],M.empty) $ ICompose mempty undefined (IChunk mempty)
 
 -- | A hole with a filling. 
 filled :: Monoid text
@@ -230,7 +231,7 @@ filled :: Monoid text
        -> filling -- ^ Hole filling
        -> HExp text filling
 filled i f 
-    = flip HExp ([],singleton i f) $ (ICompose mempty i (IChunk mempty))
+    = flip HExp ([],singleton i f) $ (ICompose mempty undefined (IChunk mempty))
 
 -- | A chunk is a constant; it's helpful to think of these as a piece of
 -- subtext. 
@@ -308,7 +309,7 @@ instance TextLike Integer where
 -- see the raw AST.
 showAST :: (TextLike text, TextLike filling) => HExp text filling -> Text
 showAST (HExp (IChunk x) _)                  = "IChunk "   <> (toText x)
-showAST (HExp (ICompose p i r) hls@(_,fhls)) = "ICompose " <> (toText p) <> " " <> (DT.show i) <> " (" <> (DT.show . (fmap toText) $ fhls !? i) <> ") (" <> (showAST (HExp r hls)) <> ")"
+showAST (HExp (ICompose p i r) hls@(_,fhls)) = "ICompose " <> (toText p) <> " " <> (DT.show i) <> " (" <> (DT.show . (fmap toText) $ fhls !? undefined) <> ") (" <> (showAST (HExp r hls)) <> ")"
 
 -- | Get the list of unfilled-hole indices present in an expression.
 -- Time complexity: \( \mathcal{O}(0) \)
@@ -398,12 +399,12 @@ plugHoleI :: Semigroup text
           -> Natural             -- ^ Hole index to plug
           -> filling             -- ^ Text to replace hole
           -> Maybe (IHExp text)
-plugHoleI toText (ICompose p h (IChunk s)) hls i c 
-    | i == h && h `elem` hls = Just $ IChunk $ p <> toText c <> s
-plugHoleI toText (ICompose p h r@(ICompose p' h' s)) hls i c 
-    | i == h && h `elem` hls = Just $ ICompose (p <> toText c <> p') h' s
-    | otherwise = do r' <- plugHoleI toText r hls i c
-                     Just $ ICompose p h r'
+plugHoleI toText (ICompose p h (IChunk s)) hls i c = undefined
+    -- | i == h && h `elem` hls = Just $ IChunk $ p <> toText c <> s
+plugHoleI toText (ICompose p h r@(ICompose p' h' s)) hls i c = undefined
+    -- | i == h && h `elem` hls = Just $ ICompose (p <> toText c <> p') h' s
+    -- | otherwise = do r' <- plugHoleI toText r hls i c
+    --               Just $ ICompose p h r'
 plugHoleI _ _ _ _ _ = Nothing       
 
 -- | Plug an unfilled hole in an expression with some filling. Returns @Nothing@ when
@@ -430,10 +431,11 @@ plugAllI
     -> (Natural -> Maybe filling)  -- ^ Plug function.
     -> IHExp text              -- ^ IHExp to plug.
     -> Maybe (IHExp text)
-plugAllI toText hls f (ICompose chk i r) | i `elem` hls = do
+plugAllI toText hls f (ICompose chk i r) = undefined 
+{- | i `elem` hls = do
     chk' <- f i
     IChunk chk'' <- plugAllI toText hls f r
-    return . IChunk $ chk <> toText chk' <> chk''
+    return . IChunk $ chk <> toText chk' <> chk'' -}
 plugAllI _ _ _ (ICompose _ _ _) = Nothing
 plugAllI _ _ _ t@(IChunk _) = return t
 
