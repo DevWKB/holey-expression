@@ -111,7 +111,7 @@ updateFreshHolePropsWith
     :: HoleProps text 
     -> (Natural,Maybe text) 
     -> HoleProps text
-updateFreshHolePropsWith holeProps@(hls, fhls) (h, Nothing)  | h `isFreshHoleIndex` holeProps = (h:hls,fhls)
+-- updateFreshHolePropsWith holeProps@(hls, fhls) (h, Nothing)  | h `isFreshHoleIndex` holeProps = (h:hls,fhls)
 updateFreshHolePropsWith holeProps@(hls, fhls) (h, (Just f)) | h `isFreshHoleIndex` holeProps = (hls,insert h f fhls)
 updateFreshHolePropsWith holeProps             (_,_)                                          = holeProps
 
