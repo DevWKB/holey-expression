@@ -180,7 +180,7 @@ decompose :: HExp text filling
           -> Maybe (text, (Natural,Maybe filling), HExp text filling)
 decompose (HExp (ICompose c i t') hlsProps) =     
      case (i,hlsProps) of
-        (EmptyHole _ (uh,fh))    -> Just (c, (i,Nothing), HExp t' (i `L.delete` uh,fh))
+        -- (EmptyHole _ (uh,fh))    -> Just (c, (i,Nothing), HExp t' (i `L.delete` uh,fh))
         (FilledHole _ f (uh,fh)) -> Just (c, (i,Just f),  HExp t' (uh,i `delete` fh))
         (UndefHole  _ _)         -> Nothing
 decompose _ = Nothing
