@@ -143,9 +143,9 @@ instance (TextLike text, HoleFilling text filling) => Show (HExp text filling) w
 -- * Combinators
 
 -- | Pattern synonym for the empty expression.
-pattern Empty :: (Eq text, Monoid text) => HExp text filling
-pattern Empty <- (null -> True) where
-    Empty = emptyExp
+-- pattern Empty :: (Eq text, Monoid text) => HExp text filling
+-- pattern Empty <- (null -> True) where
+    -- Empty = emptyExp
 
 -- | Decides if an expression corresponds to a chunk or not. 
 isChunk :: HExp text filling -> Maybe text
