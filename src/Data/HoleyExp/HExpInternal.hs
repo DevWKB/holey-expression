@@ -229,10 +229,10 @@ instance (Eq text, Eq filling) => Eq (HExp text filling) where
 (HExp t1 (hls1,_)) =-> (HExp t2 (hls2,_)) = t1 >==> t2 && hls1 == hls2
 
 -- | An empty hole.
-empty :: Monoid text
-     => Natural -- ^ Hole index
-     -> HExp text filling
-empty i = flip HExp ([i],M.empty) $ ICompose mempty i (IChunk mempty)
+-- empty :: Monoid text
+    --  => Natural -- ^ Hole index
+    --  -> HExp text filling
+-- empty i = flip HExp ([i],M.empty) $ ICompose mempty i (IChunk mempty)
 
 -- | A hole with a filling. 
 filled :: Monoid text
