@@ -263,12 +263,12 @@ instance (Eq text, Eq filling) => Eq (HExp text filling) where
 (ICompose p h r) >+> t                = ICompose p h $ r >+> t
 
 -- | Composition of holey expressions.
-(+>) :: Semigroup text 
-     => HExp text filling
-     -> HExp text filling
-     -> HExp text filling
-(HExp t1 (ufhs1,fhs1)) +> (HExp t2 (ufhs2,fhs2)) 
-    = HExp (t1 >+> t2) (ufhs1 `L.union` ufhs2,fhs1 `M.union` fhs2) 
+-- (+>) :: Semigroup text 
+--      => HExp text filling
+--      -> HExp text filling
+--      -> HExp text filling
+-- (HExp t1 (ufhs1,fhs1)) +> (HExp t2 (ufhs2,fhs2)) 
+    -- = HExp (t1 >+> t2) (ufhs1 `L.union` ufhs2,fhs1 `M.union` fhs2) 
 
 instance Semigroup text => Semigroup (HExp text filling) where
     (<>) :: HExp text filling -> HExp text filling -> HExp text filling
