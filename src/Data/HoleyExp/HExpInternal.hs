@@ -135,7 +135,7 @@ instance (TextLike text, HoleFilling text filling) => Show (HExp text filling) w
     show (HExp (ICompose prefix i rest) (emptyHoles, filledHoles))
         = (DT.unpack . toText $ prefix) 
         <> "$" <> show i <> "("
-        <> undefined -- (if i `elem` emptyHoles then "" else (DT.unpack . toText . fToT $ filledHoles ! i))
+        <> (if nonEmptyHead i `elem` emptyHoles then "" else (DT.unpack . toText . fToT $ filledHoles ! nonEmptyHead i))
         <> ")" 
         <> show (HExp rest (emptyHoles, filledHoles))
         where
@@ -181,10 +181,10 @@ compose c (i, Just f)  t = chunk c +> filled i f +> t
 decompose :: HExp text filling 
           -> Maybe (text, (Natural,Maybe filling), HExp text filling)
 decompose (HExp (ICompose c i t') hlsProps) = undefined  
-     {-case (i,hlsProps) of
-        (EmptyHole _ (uh,fh))    -> Just (c, (i,Nothing), HExp t' (i `L.delete` uh,fh))
-        (FilledHole _ f (uh,fh)) -> Just (c, (i,Just f),  HExp t' (uh,i `delete` fh))
-        (UndefHole  _ _)         -> Nothing -}
+    --  case (i,hlsProps) of
+    --     (EmptyHole _ (uh,fh))    -> Just (c, (i,Nothing), HExp t' (i `L.delete` uh,fh))
+    --     (FilledHole _ f (uh,fh)) -> Just (c, (i,Just f),  HExp t' (uh,i `delete` fh))
+    --     (UndefHole  _ _)         -> Nothing 
 decompose _ = Nothing
 
 -- | Decide if an element of a monoid is the unit.
@@ -532,3 +532,10 @@ betweenHExp :: (ToHExp text filling a)
             -> a                     -- ^ Value to be converted into an expression
             -> HExp text filling
 betweenHExp b a (toHExp->t) = b +> t +> a
+
+
+-- Additional Types
+
+-- Takes the head of a NonEmpty List
+nonEmptyHead :: NonEmpty a -> a
+nonEmptyHead (h :| _) = h
