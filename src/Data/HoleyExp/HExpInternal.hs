@@ -134,10 +134,12 @@ data HExp text filling where
 instance (TextLike text, HoleFilling text filling) => Show (HExp text filling) where
     show :: HExp text filling -> String    
     show (HExp (IChunk t) _) = DT.unpack . toText $ t    
-    show (HExp (ICompose prefix i rest) (emptyHoles, filledHoles))
+    show (HExp (ICompose prefix i rest) hprops@(emptyHoles, filledHoles))
         = (DT.unpack . toText $ prefix) 
         <> "$" <> show i <> "("
-        <> undefined -- (if i `elem` emptyHoles then "" else (DT.unpack . toText . fToT $ filledHoles ! i))
+        -- We can just get the head out assuming a well-formed expression which
+        -- implies the hole index list constraint.
+        <> (if isEmpHoleIndexList hprops i then "" else (DT.unpack . toText . fToT $ filledHoles ! NE.head i))
         <> ")" 
         <> show (HExp rest (emptyHoles, filledHoles))
         where
@@ -227,7 +229,7 @@ instance (Eq text, Eq filling) => Eq (HExp text filling) where
 empty :: Monoid text
      => Natural -- ^ Hole index
      -> HExp text filling
-empty i = flip HExp ([i],M.empty) $ ICompose mempty undefined (IChunk mempty)
+empty i = flip HExp ([i],M.empty) $ ICompose mempty (NL.singleton i) (IChunk mempty)
 
 -- | A hole with a filling. 
 filled :: Monoid text
@@ -235,7 +237,7 @@ filled :: Monoid text
        -> filling -- ^ Hole filling
        -> HExp text filling
 filled i f 
-    = flip HExp ([],singleton i f) $ (ICompose mempty undefined (IChunk mempty))
+    = flip HExp ([],singleton i f) $ (ICompose mempty (NL.singleton i) (IChunk mempty))
 
 -- | A chunk is a constant; it's helpful to think of these as a piece of
 -- subtext. 
@@ -322,6 +324,10 @@ instance TextLike Integer where
     toText :: Integer -> Text
     toText = DT.show
 
+instance TextLike () where
+    toText :: () -> Text
+    toText = DT.show
+
 -- | Convert a holey expression's AST into a `Text`. The `Show` instance for
 -- t`HExp` is set to pretty print, but for debugging it is sometimes useful to
 -- see the raw AST.
@@ -344,6 +350,10 @@ showAST (HExp (ICompose p i r) hls@(_,fhls)) = "ICompose "
                                    $ "[showAST] hole index list "
                                   <> (show i)
                                   <> " contains one or more index with one of them being filled."
+
+-- | Prints the AST of an expression to the terminal. This is useful for debugging.
+printAST :: (TextLike text, TextLike filling) => HExp text filling -> IO ()
+printAST = putStrLn . DT.unpack . showAST 
 
 -- | Get the list of unfilled-hole indices present in an expression.
 -- Time complexity: \( \mathcal{O}(0) \)
@@ -512,6 +522,10 @@ instance HoleFilling String Text where
 
     parseFilling :: Maybe(Text -> Either Text Text)
     parseFilling = Just $ Right
+
+instance HoleFilling Text Integer where
+    fillingToText :: Integer -> Text
+    fillingToText = DT.show
 
 -- | This class is used to define generic combinators on holey expressions. Simply, this
 -- is the class of types that can be converted into a t`HExp`.
