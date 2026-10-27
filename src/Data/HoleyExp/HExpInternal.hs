@@ -38,6 +38,8 @@ import Data.NatMap                (NatMap
 import Data.NatMap                qualified as M
 import Data.List.NonEmpty         (NonEmpty (..))
 import Data.List.NonEmpty         qualified as NL
+import Data.HoleyExp.Text.Helpers (parens, quotes)
+import qualified Data.List.NonEmpty as NE
 
 -- | Holes are either empty or filled; thus, a hole's properties consists of a
 -- pair of a list of natural numbers designating the set of empty holes and a
@@ -324,8 +326,24 @@ instance TextLike Integer where
 -- t`HExp` is set to pretty print, but for debugging it is sometimes useful to
 -- see the raw AST.
 showAST :: (TextLike text, TextLike filling) => HExp text filling -> Text
-showAST (HExp (IChunk x) _)                  = "IChunk "   <> (toText x)
-showAST (HExp (ICompose p i r) hls@(_,fhls)) = "ICompose " <> (toText p) <> " " <> (DT.show i) <> " (" <> (DT.show . (fmap toText) $ fhls !? undefined) <> ") (" <> (showAST (HExp r hls)) <> ")"
+showAST (HExp (IChunk x) _)                  = "IChunk "   
+                                            <> quotes (toText x)
+showAST (HExp (ICompose p i r) hls@(_,fhls)) = "ICompose " 
+                                            <> quotes (toText p) 
+                                            <> " " 
+                                            <> showHole i hls 
+                                            <> " " 
+                                            <> parens (showAST (HExp r hls)) 
+    where
+        showHole :: NonEmpty Natural -> HoleProps filling -> Text
+        showHole i hls | isEmpHoleIndexList hls i = DT.show . NE.toList $ i
+                       | not (isEmpHoleIndexList hls i) && NE.length i == 1 = let h = NE.head i 
+                                                                                  f = toText $ fhls ! h
+                                                                               in parens $ (DT.show h) <> ", " <> f
+                       | otherwise = error 
+                                   $ "[showAST] hole index list "
+                                  <> (show i)
+                                  <> " contains one or more index with one of them being filled."
 
 -- | Get the list of unfilled-hole indices present in an expression.
 -- Time complexity: \( \mathcal{O}(0) \)

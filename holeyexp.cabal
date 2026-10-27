@@ -53,6 +53,7 @@ library
       Data.HoleyExp.HExp
       Data.HoleyExp.HExpInternal
       Data.HoleyExp.Text
+      Data.HoleyExp.Text.Helpers
       Data.NatMap
   other-modules:
       Paths_holeyexp      
