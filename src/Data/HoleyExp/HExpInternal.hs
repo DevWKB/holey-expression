@@ -131,20 +131,33 @@ data HExp text filling where
          -> HoleProps filling -- ^ Empty holes and hole-filling map
          -> HExp text filling
 
-instance (TextLike text, HoleFilling text filling) => Show (HExp text filling) where
+instance (TextLike text, HoleFilling text filling) 
+    => Show (HExp text filling) where
     show :: HExp text filling -> String    
     show (HExp (IChunk t) _) = DT.unpack . toText $ t    
-    show (HExp (ICompose prefix i rest) hprops@(emptyHoles, filledHoles))
-        = (DT.unpack . toText $ prefix) 
-        <> "$" <> show i <> "("
-        -- We can just get the head out assuming a well-formed expression which
-        -- implies the hole index list constraint.
-        <> (if isEmpHoleIndexList hprops i then "" else (DT.unpack . toText . fToT $ filledHoles ! NE.head i))
-        <> ")" 
+    show (HExp (ICompose prefix holeIndexList rest) hprops@(emptyHoles, filledHoles))
+        = (DT.unpack . toText $ prefix)     
+        <> (if isEmpHoleIndexList hprops holeIndexList 
+            then expandHoleIndexList holeIndexList
+            else if not $ NE.length holeIndexList == 1
+                 then error $ "violation of the hole-index list constraint: "
+                           <> show holeIndexList
+                 else let hindex = NE.head holeIndexList
+                       in "$" <> show hindex 
+                              <> "(" 
+                              <> (DT.unpack . toText . fToT $ filledHoles ! hindex) 
+                              <> ")")
         <> show (HExp rest (emptyHoles, filledHoles))
         where
             fToT :: filling -> text
             fToT = fillingToText
+
+            expandHoleIndexList :: NonEmpty Natural -> String
+            expandHoleIndexList (hindex :| hs) 
+                = mkEmptyHole hindex 
+               <> foldl (\acc h -> acc <> mkEmptyHole h) "" hs
+                where
+                    mkEmptyHole hindex = "$" <> show hindex <> "()"
 
 -- * Combinators
 
