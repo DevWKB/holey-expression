@@ -156,8 +156,8 @@ instance (TextLike text, HoleFilling text filling)
             expandHoleIndexList (hindex :| hs) 
                 = mkEmptyHole hindex 
                <> foldl (\acc h -> acc <> mkEmptyHole h) "" hs
-                where
-                    mkEmptyHole hindex = "$" <> show hindex <> "()"
+                
+            mkEmptyHole hindex = "$" <> show hindex <> "()"
 
 -- * Combinators
 
