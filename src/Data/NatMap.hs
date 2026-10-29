@@ -37,12 +37,15 @@ module  Data.NatMap (-- * Map type
                     -- ** Map
                     ,Data.NatMap.map
                     -- * Conversion        
-                    ,keys) where
+                    ,keys
+                    -- * Comparison
+                    ,subset
+                    ,diff) where
 
 import GHC.Natural      (Natural)
 import Data.IntMap.Lazy (IntMap)
 import Data.IntMap.Lazy qualified as M
-import Prelude          hiding (null)
+import Prelude          hiding (filter, null)
 
 -- | A map of natural numbers to values @f@.
 type NatMap f = IntMap f
@@ -112,3 +115,13 @@ map = M.map
 -- See `Data.IntMap.Lazy.size`.
 size :: NatMap f -> Int
 size = M.size
+
+-- | @True@ when the first container is a subset of the second.
+subset :: (Foldable t1, Foldable t2, Eq a) => t1 a -> t2 a -> Bool
+subset l = all (flip elem l)
+
+diff :: (Applicative t,Foldable t,Monoid (t a),Eq a) => t a -> t a -> t a
+diff l1 l2 = filter (\i -> not (i `elem` l2)) l1
+
+filter :: (Applicative t,Foldable t,Monoid (t a)) => (a -> Bool) -> t a -> t a
+filter p = foldl (\acc r -> if p r then ((pure r) <> acc) else acc) mempty 
