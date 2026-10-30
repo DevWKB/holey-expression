@@ -180,11 +180,11 @@ compose c (i, Just f)  t = chunk c +> filled i f +> t
 -- | Decompose an expression into the top-level compose.
 decompose :: HExp text filling 
           -> Maybe (text, (Natural,Maybe filling), HExp text filling)
-decompose (HExp (ICompose c i t') hlsProps) = undefined  
-    --  case (i,hlsProps) of
-    --     (EmptyHole _ (uh,fh))    -> Just (c, ((NL.head i),Nothing), HExp t' ((NL.head i) `L.delete` uh,fh))
-    --     (FilledHole _ f (uh,fh)) -> Just (c, (NL.head i,Just f),  HExp t' (uh,NL.head i `delete` fh))
-    --     (UndefHole  _ _)         -> Nothing 
+decompose (HExp (ICompose c i t') hlsProps) =   
+     case (NL.head i,hlsProps) of
+        (EmptyHole _ (uh,fh))    -> Just (c, ((NL.head i),Nothing), HExp t' ((NL.head i) `L.delete` uh,fh))
+        (FilledHole _ f (uh,fh)) -> Just (c, (NL.head i,Just f),  HExp t' (uh,NL.head i `delete` fh))
+        (UndefHole  _ _)         -> Nothing 
 decompose _ = Nothing
 
 -- | Decide if an element of a monoid is the unit.
@@ -225,7 +225,7 @@ instance (Eq text, Eq filling) => Eq (HExp text filling) where
 empty :: Monoid text
      => Natural -- ^ Hole index
      -> HExp text filling
-empty i = flip HExp ([i],M.empty) $ ICompose mempty undefined (IChunk mempty)
+empty i = flip HExp ([i],M.empty) $ ICompose mempty (NL.fromList [i]) (IChunk mempty)
 
 -- | A hole with a filling. 
 filled :: Monoid text
@@ -233,7 +233,7 @@ filled :: Monoid text
        -> filling -- ^ Hole filling
        -> HExp text filling
 filled i f 
-    = flip HExp ([],singleton i f) $ (ICompose mempty undefined (IChunk mempty))
+    = flip HExp ([],singleton i f) $ (ICompose mempty (NL.fromList [i]) (IChunk mempty))
 
 -- | A chunk is a constant; it's helpful to think of these as a piece of
 -- subtext. 
@@ -325,7 +325,7 @@ instance TextLike Integer where
 -- see the raw AST.
 showAST :: (TextLike text, TextLike filling) => HExp text filling -> Text
 showAST (HExp (IChunk x) _)                  = "IChunk "   <> (toText x)
-showAST (HExp (ICompose p i r) hls@(_,fhls)) = "ICompose " <> (toText p) <> " " <> (DT.show i) <> " (" <> (DT.show . (fmap toText) $ fhls !? undefined) <> ") (" <> (showAST (HExp r hls)) <> ")"
+showAST (HExp (ICompose p i r) hls@(_,fhls)) = "ICompose " <> (toText p) <> " " <> (DT.show i) <> " (" <> (DT.show . (fmap toText) $ fhls !? NL.head i) <> ") (" <> (showAST (HExp r hls)) <> ")"
 
 -- | Get the list of unfilled-hole indices present in an expression.
 -- Time complexity: \( \mathcal{O}(0) \)
@@ -415,12 +415,12 @@ plugHoleI :: Semigroup text
           -> Natural             -- ^ Hole index to plug
           -> filling             -- ^ Text to replace hole
           -> Maybe (IHExp text)
-plugHoleI toText (ICompose p h (IChunk s)) hls i c = undefined
-    -- | i == h && h `elem` hls = Just $ IChunk $ p <> toText c <> s
-plugHoleI toText (ICompose p h r@(ICompose p' h' s)) hls i c = undefined
-    -- | i == h && h `elem` hls = Just $ ICompose (p <> toText c <> p') h' s
-    -- | otherwise = do r' <- plugHoleI toText r hls i c
-    --               Just $ ICompose p h r'
+plugHoleI toText (ICompose p h (IChunk s)) hls i c 
+    | i == NL.head h && NL.head h `elem` hls = Just $ IChunk $ p <> toText c <> s
+plugHoleI toText (ICompose p h r@(ICompose p' h' s)) hls i c
+    | i == NL.head h && NL.head h `elem` hls = Just $ ICompose (p <> toText c <> p') h' s
+    | otherwise = do r' <- plugHoleI toText r hls i c
+                     Just $ ICompose p h r'
 plugHoleI _ _ _ _ _ = Nothing       
 
 -- | Plug an unfilled hole in an expression with some filling. Returns @Nothing@ when
@@ -447,11 +447,11 @@ plugAllI
     -> (Natural -> Maybe filling)  -- ^ Plug function.
     -> IHExp text              -- ^ IHExp to plug.
     -> Maybe (IHExp text)
-plugAllI toText hls f (ICompose chk i r) = undefined 
-{- | i `elem` hls = do
-    chk' <- f i
+plugAllI toText hls f (ICompose chk i r)  
+    | NL.head i `elem` hls = do
+    chk' <- f (NL.head i)
     IChunk chk'' <- plugAllI toText hls f r
-    return . IChunk $ chk <> toText chk' <> chk'' -}
+    return . IChunk $ chk <> toText chk' <> chk''
 plugAllI _ _ _ (ICompose _ _ _) = Nothing
 plugAllI _ _ _ t@(IChunk _) = return t
 
