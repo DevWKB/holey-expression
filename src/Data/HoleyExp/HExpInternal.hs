@@ -477,20 +477,74 @@ update (HExp t hlsProps) i (Just c) =
 -- the hole index doesn't exist in the expression or is filled, otherwise returns
 -- an expression with the hole plugged. Plugging a hole replaces the hole with the
 -- value unlike `update`.
-plugHoleI :: Semigroup text
-          => (filling -> text)
-          -> IHExp text
+plugHoleI :: (Monoid text, Eq text)
+          => (filling -> text)   -- ^ Function to translate fillings into text
+          -> IHExp text          -- ^ Expression to plug
           -> [Natural]           -- ^ List of unfilled holes
           -> Natural             -- ^ Hole index to plug
           -> filling             -- ^ Text to replace hole
           -> Maybe (IHExp text)
-plugHoleI toText (ICompose p h (IChunk s)) hls i c = undefined
-    -- | i == h && h `elem` hls = Just $ IChunk $ p <> toText c <> s
-plugHoleI toText (ICompose p h r@(ICompose p' h' s)) hls i c = undefined
-    -- | i == h && h `elem` hls = Just $ ICompose (p <> toText c <> p') h' s
-    -- | otherwise = do r' <- plugHoleI toText r hls i c
-    --               Just $ ICompose p h r'
-plugHoleI _ _ _ _ _ = Nothing       
+plugHoleI toText (ICompose prefix hole suffix) emptyHoles holeIndex filling 
+    | emptyHole hole (emptyHoles,M.empty) && holeIndex `elem` hole
+        = do newSuffix <- plugHoleI toText suffix emptyHoles holeIndex filling
+             Just $ (>+>) ((>+>) (IChunk prefix) 
+                                 (expandEmptyHole emptyHoles (NE.toList hole) holeIndex (toText filling))
+                                 (emptyHoles,M.empty)) 
+                       newSuffix (emptyHoles,M.empty)
+    | otherwise = do 
+        newSuffix <- plugHoleI toText suffix emptyHoles holeIndex filling
+        pure $ ICompose prefix hole newSuffix
+plugHoleI _ _ _ _ _ = Nothing
+
+-- | Expands an empty hole into an @IHExp@ inserting the given filling in the
+-- proper position. 
+--
+-- Suppose we have a hole @[1,2,3]@, filling @"F"@, and the hole index being
+-- replaced is @2@, then @expandEmptyHole [1,2,3,4,5] [1,2,3] 2 "F"@ computes
+-- the following:
+--
+-- 1. Compute the prefix hole @[1]@ and suffix hole $[3]$.
+-- 2. Insert the filling between the prefix and suffix: 
+--      @ICompose mempty [1] (ICompose "F" [3] (IChunk ""))@
+--
+-- The interesting cases are where the hole index is first, last, or repeated in
+-- the hole index list.
+--
+-- - @expandEmptyHole  [1,2,3,4,5] [2,1,2,3] 2 "F"  = ICompose "F" (1 :| []) (ICompose "F" (3 :| []) (IChunk ""))@
+-- - @expandEmptyHole  [1,2,3,4,5] [1,3,2]   2 "F"  = ICompose "" (1 :| [3]) (IChunk "F")@
+-- - @ expandEmptyHole [1,2,3,4,5] [2,3,2]   2 "F"  = ICompose "F" (3 :| []) (IChunk "F")@
+expandEmptyHole 
+    :: (Monoid text,Eq text) 
+    => [Natural] -- ^ Set of allowed empty hole indexes
+    -> [Natural] -- ^ The empty hole to expand
+    -> Natural   -- ^ The hole index to replace
+    -> text      -- ^ The filling to replace the hole index with
+    -> IHExp text
+expandEmptyHole emptyHoles hole holeIndex filling      
+    = case rest of
+        -- If after removing the prefix from `hole` we get an empty list, then
+        -- there are no more hole indexes to consider, so construct the last
+        -- `IHExp`.
+        [] -> mkIHExp prefix mempty
+        -- If after removing the prefix from `hole` we get a non-empty list,
+        -- then the head of that list is `holeIndex` so skip it, and construct
+        -- the next `IHExp` and compose it with the expansion of the `suffix`.
+        (_:suffix) -> mkIHExp prefix filling
+                        >+> expandEmptyHole emptyHoles suffix holeIndex filling
+                          $ (emptyHoles,M.empty)
+    where
+        -- Computes the longest prefix of hole indexes in `hole` up to
+        -- `holeIndex`, and everything after this prefix *including* the
+        -- `holeIndex`.
+        (prefix,rest) = span (not . (==holeIndex)) hole
+        -- Constructs the next `IHExp` to add to the result. If the prefix is
+        -- empty, then the `holeIndex` was at the beginning of the hole index
+        -- list, but if not, then we compose the empty hole `prefix` with the
+        -- filling.
+        mkIHExp prefix filling 
+            = case prefix of
+                    [] -> IChunk filling
+                    _  -> ICompose mempty (NE.fromList prefix) (IChunk filling)
 
 -- | Plug an unfilled hole in an expression with some filling. Returns @Nothing@ when
 -- the hole index doesn't exist in the expression or is filled, otherwise returns
@@ -529,7 +583,7 @@ plugAllI _ _ _ t@(IChunk _) = return t
 -- expression, then this function guarantees an expression with no holes (a constant) is
 -- returned.
 plugAll :: HoleFilling text filling 
-        => HExp text filling                     -- ^ HExp to plug
+        => HExp text filling                         -- ^ HExp to plug
         -> ([Natural] -> (Natural -> Maybe filling)) -- ^ Plug function
         -> Maybe text
 plugAll (HExp t (hls,fhls)) f | M.null fhls = 
@@ -549,6 +603,13 @@ class (Monoid text,Eq text,Eq filling) => HoleFilling text filling  where
 
     parseFilling :: Maybe (Text -> Either Text filling)
     parseFilling = Nothing    
+
+instance HoleFilling Text Text where
+    fillingToText :: Text -> Text
+    fillingToText = id
+
+    parseFilling :: Maybe(Text -> Either Text Text)
+    parseFilling = Just Right
 
 instance HoleFilling Text String where
     fillingToText :: String -> Text
