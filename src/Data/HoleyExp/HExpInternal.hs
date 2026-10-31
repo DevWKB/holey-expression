@@ -134,9 +134,8 @@ instance (TextLike text, HoleFilling text filling) => Show (HExp text filling) w
     show (HExp (IChunk t) _) = DT.unpack . toText $ t    
     show (HExp (ICompose prefix i rest) (emptyHoles, filledHoles))
         = (DT.unpack . toText $ prefix) 
-        <> "$" <> show i <> "("
-        <> (if isEmpHoleIndexList (emptyHoles, filledHoles) i then "" else (DT.unpack . toText . fToT $ filledHoles ! NL.head i))
-        <> ")" 
+        <> "$" <> show (NL.head (NL.tails i))
+        <> (if isEmpHoleIndexList (emptyHoles, filledHoles) i then "()" else "(" <> (DT.unpack . toText . fToT $ filledHoles ! NL.head i) <> ")")
         <> show (HExp rest (emptyHoles, filledHoles))
         where
             fToT :: filling -> text
