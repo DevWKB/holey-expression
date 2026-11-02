@@ -512,7 +512,7 @@ plugHoleI _ _ _ _ _ = Nothing
 --
 -- - @expandEmptyHole  [1,2,3,4,5] [2,1,2,3] 2 "F"  = ICompose "F" (1 :| []) (ICompose "F" (3 :| []) (IChunk ""))@
 -- - @expandEmptyHole  [1,2,3,4,5] [1,3,2]   2 "F"  = ICompose "" (1 :| [3]) (IChunk "F")@
--- - @ expandEmptyHole [1,2,3,4,5] [2,3,2]   2 "F"  = ICompose "F" (3 :| []) (IChunk "F")@
+-- - @expandEmptyHole  [1,2,3,4,5] [2,3,2]   2 "F"  = ICompose "F" (3 :| []) (IChunk "F")@
 expandEmptyHole 
     :: (Monoid text,Eq text) 
     => [Natural] -- ^ Set of allowed empty hole indexes
