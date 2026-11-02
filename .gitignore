@@ -3,3 +3,9 @@ megaparsec
 report.html
 dist-newstyle
 Dockerfile
+*-ottput.tex
+*.aux
+*.log
+*.out
+paper.pdf
+spec-inc.tex
