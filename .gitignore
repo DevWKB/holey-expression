@@ -9,3 +9,7 @@ Dockerfile
 *.out
 paper.pdf
 spec-inc.tex
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl

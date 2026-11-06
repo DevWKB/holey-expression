@@ -4,7 +4,19 @@ embed
                  \usepackage{relsize} }}
 
 metavar termvar, x, y , z, f  ::=
-metavar semiringEl, r , s ::=
-metavar type, T , S ::=
+metavar textlike, t ::=
 indexvar i , j ::=
+
+grammar 
+HExp :: 'he_' ::=
+  | t               ::  :: TextLike         {{ com TextLike }}
+  | t t'            ::  :: App
+
+defns
+Evals :: '' ::=
+ 
+ defn
+ t1 --> t2 :: ::compose::'' {{ com compose $[[he1]]$ composed of $[[he2]]$ }} by
+
+
 
