@@ -3,20 +3,39 @@ embed
                  \usepackage{stmaryrd}
                  \usepackage{relsize} }}
 
-metavar termvar, x, y , z, f  ::=
+metavar filling, f  ::=
 metavar textlike, t ::=
-indexvar i , j ::=
+metavar natural, n ::=
+metavar hole, h ::=
+indexvar i, j ::=
 
 grammar 
-HExp :: 'he_' ::=
-  | t               ::  :: TextLike         {{ com TextLike }}
-  | t t'            ::  :: App
+HoleProps :: 'hprops_' ::=
+  | ( n , nm )                ::  :: Struc      {{ com structure }}
+  | h f                       ::  :: App        {{ com application }}
+
+grammar
+NatMap :: 'nm_' ::=
+  | nm f                      ::  :: App        {{ com application }}
+
+grammar
+HoleyExp :: 'e_' ::=
+  | chunk t                   ::  :: Chunk
+  | compose t n e             ::  :: Compose
+
+terminals :: 'terminals_' ::=
+  | |-            ::  :: turnstile   {{ tex \vdash }}
 
 defns
-Evals :: '' ::=
- 
- defn
- t1 --> t2 :: ::compose::'' {{ com compose $[[he1]]$ composed of $[[he2]]$ }} by
+
+identity :: '' ::=
+
+defn
+hprops |- chunk t ::  :: isChunk :: '' by
+
+  ------------ :: Chunk
+  hprops |- chunk t
+
 
 
 
