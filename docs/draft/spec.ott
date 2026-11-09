@@ -8,36 +8,43 @@ metavar semiringEl, r , s ::=
 metavar type, T , S ::=
 indexvar i , j ::=
 
-grammar 
-HoleProps :: 'hprops_' ::=
-  | T
-  | ( i , s )                ::  :: Struc      {{ com structure }}
-  | hprops f                  ::  :: App        {{ com application }}
-
-grammar
-NatMap :: 'nm_' ::=
-  | nm f                      ::  :: App        {{ com application }}
 
 grammar
 hexp :: 'e_' ::=
   | chunk r                   ::  :: Chunk
   | compose r x e             ::  :: Compose
 
+holeprops :: 'hprops_' ::=
+  | ( xi .. xj , s )          ::  :: Struc      {{ com structure }}
+  | hprops f                  ::  :: App        {{ com application }}
+
+hole :: 'h_' ::=
+  | ( i , hprops )            ::  :: Struc      {{ com structure }}
+
+c :: 'c_' ::=
+  | chunk r                   ::  :: Chunk
+
+
 terminals :: 'terminals_' ::=
-  | |-            ::  :: turnstile   {{ tex \vdash }}
-  | chunk         ::  :: chunk
-  | compose       ::  :: compose
+  | |-            ::  :: turnstile    {{ tex \vdash }}
+  | chunk         ::  :: chunk        {{ tex \mathit{chunk} }}
+  | compose       ::  :: compose      {{ tex \mathit{compose} }}
+
 
 formula :: formula_ ::=
 |   judgement                 ::  :: judgement
 |   formulai .. formulaj      ::  :: dots
 
+
+subrules
+  c <:: hexp
+
 defns
 
-isChunk :: '' ::=
+isHExp :: '' ::=
 
-defn
-x |- e ::  :: isChunk :: '' by
+  defn
+  hprops |- chunk r ::  :: isChunk :: '' {{ com HExp is a chunk }} by
 
-  ------------ :: Chunk
-  x |- chunk t
+    ----------------- :: Chunk
+    hprops |- chunk r
