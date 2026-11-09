@@ -10,9 +10,10 @@ indexvar i , j ::=
 
 
 grammar
-hexp :: 'e_' ::=
+hexp, e :: 'e_' ::=
   | chunk r                   ::  :: Chunk
   | compose r x e             ::  :: Compose
+  | ( e )                     :: S :: Parens
 
 holeprops :: 'hprops_' ::=
   | ( xi .. xj , s )          ::  :: Struc      {{ com structure }}
@@ -21,20 +22,19 @@ holeprops :: 'hprops_' ::=
 hole :: 'h_' ::=
   | ( i , hprops )            ::  :: Struc      {{ com structure }}
 
+% This is a comment
 c :: 'c_' ::=
   | chunk r                   ::  :: Chunk
-
 
 terminals :: 'terminals_' ::=
   | |-            ::  :: turnstile    {{ tex \vdash }}
   | chunk         ::  :: chunk        {{ tex \mathit{chunk} }}
   | compose       ::  :: compose      {{ tex \mathit{compose} }}
 
-
 formula :: formula_ ::=
-|   judgement                 ::  :: judgement
-|   formulai .. formulaj      ::  :: dots
-
+  | judgement                 ::  :: judgement
+  | formulai .. formulaj      ::  :: dots
+  | formula1 && formula2      ::  :: formulas
 
 subrules
   c <:: hexp
@@ -44,15 +44,14 @@ defns
 isHExp :: '' ::=
 
   defn
-  hprops |- chunk r ::  :: isChunk :: '' {{ com HExp is a chunk }} by
+  isChunk e ::  :: isChunk :: '' {{ com HExp is a chunk }} by
 
     ----------------- :: Chunk
-    hprops |- chunk r
+    isChunk (chunk r)
 
   defn
   hprops |- e ::  :: isComposed :: '' by
 
-    compose r (i, hprops) |- h
-    hprops |- e
-    ----------------------- :: Compose
-    hprops |- compose r h e
+    hprops |- e && isChunk e
+    ------------------------ :: Compose
+    hprops |- compose r x e
