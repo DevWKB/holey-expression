@@ -3,39 +3,41 @@ embed
                  \usepackage{stmaryrd}
                  \usepackage{relsize} }}
 
-metavar filling, f  ::=
-metavar textlike, t ::=
-metavar natural, n ::=
-metavar hole, h ::=
-indexvar i, j ::=
+metavar termvar, x, y , z, f  ::=
+metavar semiringEl, r , s ::=
+metavar type, T , S ::=
+indexvar i , j ::=
 
 grammar 
 HoleProps :: 'hprops_' ::=
-  | ( n , nm )                ::  :: Struc      {{ com structure }}
-  | h f                       ::  :: App        {{ com application }}
+  | T
+  | ( i , s )                ::  :: Struc      {{ com structure }}
+  | hprops f                  ::  :: App        {{ com application }}
 
 grammar
 NatMap :: 'nm_' ::=
   | nm f                      ::  :: App        {{ com application }}
 
 grammar
-HoleyExp :: 'e_' ::=
-  | chunk t                   ::  :: Chunk
-  | compose t n e             ::  :: Compose
+hexp :: 'e_' ::=
+  | chunk r                   ::  :: Chunk
+  | compose r x e             ::  :: Compose
 
 terminals :: 'terminals_' ::=
   | |-            ::  :: turnstile   {{ tex \vdash }}
+  | chunk         ::  :: chunk
+  | compose       ::  :: compose
+
+formula :: formula_ ::=
+|   judgement                 ::  :: judgement
+|   formulai .. formulaj      ::  :: dots
 
 defns
 
-identity :: '' ::=
+isChunk :: '' ::=
 
 defn
-hprops |- chunk t ::  :: isChunk :: '' by
+x |- e ::  :: isChunk :: '' by
 
   ------------ :: Chunk
-  hprops |- chunk t
-
-
-
-
+  x |- chunk t
