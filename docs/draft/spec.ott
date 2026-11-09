@@ -48,3 +48,11 @@ isHExp :: '' ::=
 
     ----------------- :: Chunk
     hprops |- chunk r
+
+  defn
+  hprops |- e ::  :: isComposed :: '' by
+
+    compose r (i, hprops) |- h
+    hprops |- e
+    ----------------------- :: Compose
+    hprops |- compose r h e
