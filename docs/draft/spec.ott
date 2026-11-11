@@ -15,26 +15,32 @@ hexp, e :: 'e_' ::=
   | compose r x e             ::  :: Compose
   | ( e )                     :: S :: Parens
 
-holeprops :: 'hprops_' ::=
+holeprops, hp :: 'hprops_' ::=
   | ( xi .. xj , s )          ::  :: Struc      {{ com structure }}
   | hprops f                  ::  :: App        {{ com application }}
 
-hole :: 'h_' ::=
+hole, h :: 'h_' ::=
   | ( i , hprops )            ::  :: Struc      {{ com structure }}
 
 % This is a comment
-c :: 'c_' ::=
+c :: 'c_' ::=                                   {{ com chunk subgrammar}}
   | chunk r                   ::  :: Chunk
 
 terminals :: 'terminals_' ::=
   | |-            ::  :: turnstile    {{ tex \vdash }}
   | chunk         ::  :: chunk        {{ tex \mathit{chunk} }}
   | compose       ::  :: compose      {{ tex \mathit{compose} }}
+  | in            ::  :: elementOf    {{ tex \in }}
+  | nin           ::  :: notIn        {{ tex \notin }}
+  | and           ::  :: andSymbol    {{ tex \cap }}
+  | !             ::  :: not          {{ tex \neg }}
 
 formula :: formula_ ::=
-  | judgement                 ::  :: judgement
-  | formulai .. formulaj      ::  :: dots
-  | formula1 && formula2      ::  :: formulas
+  | judgement                 ::   :: judgement
+  | formulai .. formulaj      ::   :: dots
+  | formula1 && formula2      ::   :: formulas
+  | not formula               :: M :: not
+        {{ tex \neg [[formula]] }}
 
 subrules
   c <:: hexp
@@ -50,8 +56,56 @@ isHExp :: '' ::=
     isChunk (chunk r)
 
   defn
-  hprops |- e ::  :: isComposed :: '' by
+  hprops |- e ::  :: isComposed :: '' {{ com HExp is composed of text, an index, and a HExp }}  by
 
+    % Trying to use && here leads to multiple parses
     hprops |- e && isChunk e
     ------------------------ :: Compose
     hprops |- compose r x e
+
+% isHole definitions below
+defns
+
+holeOps :: '' ::=
+
+  % Support judgements
+  defn
+  isHole h ::  :: isHoleList :: '' {{ com is a hole }} by
+
+    --------------------- :: structure
+    isHole h
+
+  defn
+  i in ehls ::  :: emptyIndex :: '' {{ com index of empty hole }} by
+
+    isHole (i, hprops)
+    ------------------ :: empty
+    i in ehls
+
+  defn
+  i in fhls ::  :: filledIndex :: '' {{ com index of filled hole }} by
+
+    isHole (i, hprops)
+    ------------------ :: filled
+    i in fhls
+
+  defn
+  |h| > 0 ::  :: oneHoleMin :: '' {{ com at least one hole exists }} by
+
+    ------- :: min_one_hole
+    |h| > 0
+
+  % End of support judgments
+
+  defn
+  (ehls, fhls) |- [i] ::  :: filledHoles :: '' {{ com list of filled hole indices }} by
+
+    isHole (i, hprops)
+    not i in ehls
+    i in fhls
+    ------------------- :: filled_list
+    (ehls, fhls) |- [i]
+
+  % Need to implement out forall 
+  defn
+  (ehls, fhls) |- h ::  :: emptyHole :: '' {{ com singleton list containing empty hole }} by
