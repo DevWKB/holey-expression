@@ -39,6 +39,7 @@ formula :: formula_ ::=
   | judgement                 ::   :: judgement
   | formulai .. formulaj      ::   :: dots
   | formula1 && formula2      ::   :: formulas
+  | ( formula )               :: S :: parens
   | not formula               :: M :: not
         {{ tex \neg [[formula]] }}
 
@@ -59,7 +60,7 @@ isHExp :: '' ::=
   hprops |- e ::  :: isComposed :: '' {{ com HExp is composed of text, an index, and a HExp }}  by
 
     % Trying to use && here leads to multiple parses
-    hprops |- e && isChunk e
+    ( hprops |- e ) && ( isChunk e )
     ------------------------ :: Compose
     hprops |- compose r x e
 
