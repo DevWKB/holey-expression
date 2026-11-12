@@ -37,10 +37,9 @@ terminals :: 'terminals_' ::=
 
 formula :: formula_ ::=
   | judgement                 ::   :: judgement
-  | formulai .. formulaj      ::   :: dots
-  | formula1 && formula2      ::   :: formulas
-  | ( formula )               :: S :: parens
-  | not formula               :: M :: not
+  | judgement1 && judgement2  ::   :: judgements
+  | formulai .. formulaj      ::   :: dots  
+  | not ( formula )           :: M :: not
         {{ tex \neg [[formula]] }}
 
 subrules
@@ -60,7 +59,7 @@ isHExp :: '' ::=
   hprops |- e ::  :: isComposed :: '' {{ com HExp is composed of text, an index, and a HExp }}  by
 
     % Trying to use && here leads to multiple parses
-    ( hprops |- e ) && ( isChunk e )
+    hprops |- e && isChunk e
     ------------------------ :: Compose
     hprops |- compose r x e
 
@@ -102,7 +101,7 @@ holeOps :: '' ::=
   (ehls, fhls) |- [i] ::  :: filledHoles :: '' {{ com list of filled hole indices }} by
 
     isHole (i, hprops)
-    not i in ehls
+    not ( i in ehls )
     i in fhls
     ------------------- :: filled_list
     (ehls, fhls) |- [i]
