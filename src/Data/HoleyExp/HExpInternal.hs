@@ -20,6 +20,7 @@ Maintainer  : harley.eades@gmail.com
 {-# LANGUAGE FlexibleInstances            #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE QuasiQuotes #-}
 module Data.HoleyExp.HExpInternal where
 import Prelude                    hiding (null)
 import Data.Text                  (Text)
@@ -41,103 +42,128 @@ import Data.List.NonEmpty         qualified as NL
 import Data.HoleyExp.Text.Helpers (parens, quotes)
 import qualified Data.List.NonEmpty as NE
 import Data.NatMap (subset, diff)
+import Control.Lens (Lens', lens, (^.))
+import Control.Lens.Setter qualified as L
 
--- | Holes are either empty or filled; thus, a hole's properties consists of a
--- pair of a list of natural numbers designating the set of empty holes and a
--- natural-number map (t'NatMap') that assigns fillings of type @f@ to hole
--- indices.
-type HoleProps f = ([Natural],NatMap f)
+data HoleProps f
+    = MkHProps {
+     _emptyHolesHP :: [Natural]
+    ,_filledHolesHP :: NatMap f
+    ,_pluggedHoleHP :: NatMap f
+} 
 
--- | A hole that can be filled with a filling of type @f@ is a natural number
--- and a set of hole properties (t`HoleProps`).
-type Hole f      = (NonEmpty Natural,HoleProps f)
+emptyHolesHP :: Lens' (HoleProps f) [Natural]
+emptyHolesHP 
+    = lens _emptyHolesHP 
+    $ \(MkHProps _ fHP pHP ) eHP' 
+        -> MkHProps eHP' fHP pHP
+
+filledHolesHP :: Lens' (HoleProps f) (NatMap f)
+filledHolesHP 
+    = lens _filledHolesHP
+    $ \(MkHProps eHP _ pHP ) fHP' 
+        -> MkHProps eHP fHP' pHP
+
+pluggedHolesHP :: Lens' (HoleProps f) (NatMap f)
+pluggedHolesHP 
+    = lens _pluggedHoleHP
+    $ \(MkHProps eHP fHP _ ) pHP'
+        -> MkHProps eHP fHP pHP'
+
+-- | Accessing setter of an 'HoleProps'.
+(%~) :: Lens' (HoleProps f) a -> (a -> a) -> (HoleProps f -> HoleProps f)
+(%~) l f = (L.%~) l f
+
+isEmptyHProps :: HoleProps f -> Bool
+isEmptyHProps hprops 
+    = L.null (hprops ^. emptyHolesHP)
+   && M.null (hprops ^. filledHolesHP)
+   && M.null (hprops ^. pluggedHolesHP)
+
+-- | Union two `HoleProps`.
+union :: HoleProps f -> HoleProps f -> HoleProps f
+union hprops1 hprops2 
+    = emptyHolesHP   %~ (L.union $ hprops2 ^. emptyHolesHP) 
+    $ filledHolesHP  %~ (M.union $ hprops2 ^. filledHolesHP) 
+    $ pluggedHolesHP %~ (M.union $ hprops2 ^. pluggedHolesHP) 
+    $ hprops1
+
+-- | Equality for 'HoleProps'.
+eqHProps :: Eq f => HoleProps f -> HoleProps f -> Bool
+eqHProps hprops1 hprops2 
+    = (hprops1 ^. emptyHolesHP)   == (hprops2 ^. emptyHolesHP) 
+   && (hprops1 ^. filledHolesHP)  == (hprops2 ^. filledHolesHP) 
+   && (hprops1 ^. pluggedHolesHP) == (hprops2 ^. pluggedHolesHP) 
+
+-- | Moves an empty hole to a filled hole.
+emptyHole2Filled 
+    :: HoleProps f -- ^ Hole props to update
+    -> Natural       -- ^ Index of the empty hole
+    -> f             -- ^ Filling
+    -> HoleProps f
+emptyHole2Filled hprops hindex filling 
+    = emptyHolesHP  %~ (L.delete hindex)
+    $ filledHolesHP %~ (insert hindex filling)
+    $ hprops
+
+-- | A hole that can be filled with a filling of type @f@ is essentially a
+-- natural number and a set of hole properties (t`HoleProps`).
+type Hole f = (Natural,HoleProps f)
 
 -- ** Hole Patterns
 
 -- | Pattern synonym for empty holes. 
-pattern EmptyHole :: NonEmpty Natural -> HoleProps f -> Hole f
-pattern EmptyHole i hlsProps <- (decomposeEmptyHole -> Just (i,hlsProps))
+pattern EmptyHole :: Hole f
+pattern EmptyHole <- (decomposeEmptyHole -> True)
 
 -- | Determines if the input hole index @i@ is the index of an empty hole.
-decomposeEmptyHole :: (NonEmpty Natural, HoleProps f) -> Maybe (NonEmpty Natural, HoleProps f)
-decomposeEmptyHole h@(i,hlsProps) | emptyHole i hlsProps = Just h
-                                  | otherwise = Nothing
-
--- | Decides if the given hole index list represents an empty hole with respect
--- to the given hole properties. This returns `True` when the given index list
--- contains only empty holes, and none of the indexes are not defined in the map
--- of filled holes.
-emptyHole :: NonEmpty Natural -> HoleProps f -> Bool
-emptyHole = flip isEmptyHoleIndexList
-    where
-        isEmptyHoleIndexList :: HoleProps f -> NonEmpty Natural -> Bool
-        isEmptyHoleIndexList (emptyHoles,filledHoles) (i :| l) 
-            | i `elem` emptyHoles && not (i `elem` keys filledHoles) 
-                = foldl (\acc j -> j `elem` emptyHoles && acc) True l
-            | otherwise 
-                = False
-
+decomposeEmptyHole :: (Natural, HoleProps f) -> Bool
+decomposeEmptyHole (i,hlsProps) = i `elem` hlsProps ^. emptyHolesHP                                  
 
 -- | Pattern synonym for filled holes.
-pattern FilledHole :: NonEmpty Natural -> f -> HoleProps f -> Hole f
-pattern FilledHole i f hlsProps <- (decomposeFilledHole -> Just (i,Just f,hlsProps))
+pattern FilledHole :: f -> Hole f
+pattern FilledHole f <- (decomposeFilledHole -> Just f)
 
--- | Determines if the input hole index list @i@ contains the index of a filled hole.
-decomposeFilledHole :: Hole f -> Maybe (NonEmpty Natural, Maybe f, HoleProps f)
-decomposeFilledHole (i,hlsProps@(_,fhls)) | filledHole i hlsProps = Just (i,fhls !? NE.head i,hlsProps)
-                                          | otherwise             = Nothing
+-- | Determines if the input hole index @i@ is the index of a filled hole.
+decomposeFilledHole :: Hole f -> Maybe f
+decomposeFilledHole (i,hprops) = (hprops ^. filledHolesHP) !? i
 
--- | Decides if the given hole index list represents a filled hole with respect
--- to the given hole properties. This returns `True` when the given index list
--- is a singleton list, doesn't contain a empty hole, but contains an index in
--- the map of filled holes.
-filledHole :: NonEmpty Natural -> HoleProps f -> Bool
-filledHole i hprops@(_,fhls) 
-    = (NE.length i == 1
-    && not (emptyHole i hprops))
-    && (i `subset` (keys fhls))   
+-- | Pattern synonym for filled holes.
+pattern PluggedHole :: f -> Hole f
+pattern PluggedHole t <- (decomposePluggedHole -> Just t)
 
+-- | Determines if the input hole index @i@ is the index of a plugged hole.
+decomposePluggedHole :: Hole f -> Maybe f
+decomposePluggedHole (i,hprops) = (hprops ^. pluggedHolesHP) !? i
 
 -- | Pattern synonym for undefined holes. These are holes which are not currently used
 -- in the expression; and thus, are neither free nor empty.
-pattern UndefHole :: NonEmpty Natural -> HoleProps f -> Hole f
-pattern UndefHole i hlsProps <- (decomposeUndefHole -> Just (i,hlsProps))
+pattern UndefHole :: Hole f
+pattern UndefHole <- (decomposeUndefHole -> True)
 
 -- | Determines if the input hole index @i@ is neither an empty hole or a filled
 -- hole; thus, is undefined in the expression.
-decomposeUndefHole :: Hole f -> Maybe (Hole f)
-decomposeUndefHole h | isNothing (decomposeEmptyHole h) && isNothing (decomposeFilledHole h) = Just h
-                     | otherwise = Nothing
+decomposeUndefHole :: Hole f -> Bool
+decomposeUndefHole h 
+    = not (decomposeEmptyHole h) 
+   && isNothing (decomposeFilledHole h) 
+   && isNothing (decomposePluggedHole h)
 
-{-# COMPLETE EmptyHole, FilledHole, UndefHole #-}
+{-# COMPLETE EmptyHole, FilledHole, PluggedHole, UndefHole #-}
 
 -- | Tests to see if a hole index exist in the given hole properties.
-isFreshHoleIndex :: Natural     -- ^ Hole index
+isFreshHoleIndex :: Natural       -- ^ Hole index
                  -> HoleProps f -- ^ Hole properties
                  -> Bool
-isFreshHoleIndex (NE.singleton->h) holeProps 
+isFreshHoleIndex h holeProps 
     = not 
-    $ filledHole h holeProps || emptyHole h holeProps
+    $ h `elem` (holeProps ^. emptyHolesHP) 
+   && h `elem` (keys $ holeProps ^. filledHolesHP) 
+   && h `elem` (keys $ holeProps ^. pluggedHolesHP) 
 
 -- | The hole properties with no defined holes.
 emptyHoleProps :: HoleProps f
-emptyHoleProps = ([], M.empty)
-
-
--- | Adds a hole index and potential filling to the given hole properties. If
--- the given filling is @Nothing@ then the hole is assumed to be added as an
--- unfilled hole, otherwise it's added as a filled hole. The given index cannot
--- already exist in the hole properties.
-updateFreshHolePropsWith 
-    :: HoleProps text 
-    -> (Natural,Maybe text) 
-    -> HoleProps text
-updateFreshHolePropsWith holeProps@(hls, fhls) (h, Nothing)  
-    | h `isFreshHoleIndex` holeProps = (h:hls,fhls)
-updateFreshHolePropsWith holeProps@(hls, fhls) (h, (Just f)) 
-    | h `isFreshHoleIndex` holeProps = (hls,insert h f fhls)
-updateFreshHolePropsWith holeProps (_,_) 
-    = holeProps
+emptyHoleProps = MkHProps [] M.empty M.empty
 
 -- | The underlying structure of t'HExp'.
 data IHExp text where
@@ -156,30 +182,29 @@ instance (TextLike text, HoleFilling text filling)
     => Show (HExp text filling) where
     show :: HExp text filling -> String    
     show (HExp (IChunk t) _) = DT.unpack . toText $ t    
-    show (HExp (ICompose prefix holeIndexList rest) hprops@(emptyHoles, filledHoles))
+    show (HExp (ICompose prefix holeIndexList rest) hprops)
         = (DT.unpack . toText $ prefix)     
-        <> (if emptyHole holeIndexList hprops
-            then expandHoleIndexList holeIndexList
-            else if not $ NE.length holeIndexList == 1
-                 then error $ "violation of the hole-index list constraint: "
-                           <> show holeIndexList
-                 else let hindex = NE.head holeIndexList
-                       in "$" <> show hindex 
-                              <> "(" 
-                              <> (DT.unpack . toText . fToT $ filledHoles ! hindex) 
-                              <> ")")
-        <> show (HExp rest (emptyHoles, filledHoles))
+        <> (foldl (\acc hindex -> 
+                    case (hindex,hprops) of
+                        EmptyHole     -> acc <> mkHoleText hindex Nothing
+                        FilledHole  _ -> acc <> (mkHoleText hindex $ (hprops ^. filledHolesHP) !? hindex) <> ")"
+                        PluggedHole _ -> fToS $ (hprops ^. pluggedHolesHP) ! hindex
+                        UndefHole     -> error "unrecognized hole index: " <> show hindex) 
+                  "" 
+                  holeIndexList)
+        <> show (HExp rest hprops)
         where
             fToT :: filling -> text
             fToT = fillingToText
 
-            expandHoleIndexList :: NonEmpty Natural -> String
-            expandHoleIndexList (hindex :| hs) 
-                = mkEmptyHole hindex 
-               <> foldl (\acc h -> acc <> mkEmptyHole h) "" hs
-                
-            mkEmptyHole hindex = "$" <> show hindex <> "()"
+            fToS = DT.unpack . toText . fToT
 
+            mkHoleText :: Natural -> Maybe filling -> String
+            mkHoleText hindex filling
+                = "$" <> show hindex 
+                      <> "("
+                      <> maybe "" fToS filling 
+                      <> ")"            
 -- * Combinators
 
 -- | Pattern synonym for the empty expression.
@@ -189,7 +214,7 @@ pattern Empty <- (null -> True) where
 
 -- | Decides if an expression corresponds to a chunk or not. 
 isChunk :: HExp text filling -> Maybe text
-isChunk (HExp (IChunk s) ([],m)) | M.null m = Just s
+isChunk (HExp (IChunk s) hprops) | isEmptyHProps hprops = Just s
 isChunk _ = Nothing
 
 -- | Pattern synonym for expression chunk's.
@@ -198,21 +223,35 @@ pattern Chunk s <- (isChunk -> Just s)
     where
         Chunk = chunk
 
+-- | Construct an `HExp` from a hole-index list.
+fromHoleIndexList 
+    :: HoleFilling t f
+    => NonEmpty Natural 
+    -> HoleProps f 
+    -> HExp t f
+fromHoleIndexList h hprops 
+    = foldl (\acc hindex -> 
+                acc +> 
+                    case (hindex,hprops) of 
+                        EmptyHole     -> empty hindex
+                        FilledHole f  -> filled hindex f
+                        PluggedHole t -> chunk . fillingToText $ t
+                        UndefHole     -> error $ "unrecognized hole index: "<>show hindex) 
+            emptyExp 
+            h
+
 -- | Pattern synonym for the composition of holey expressions.
 pattern Compose :: (Monoid text, Eq text) 
     => text 
-    -> (NonEmpty Natural,Maybe filling) 
+    -> NonEmpty Natural
     -> HExp text filling 
     -> HExp text filling
 pattern Compose c h t <- (decompose -> Just (c, h, t))
-    where            
-        Compose c (h,Nothing) t = chunk c +> (foldMap empty h) +> t 
-        Compose c (h,Just f)  t = chunk c +> filled (NE.head h) f +> t 
 
 {-# COMPLETE Chunk, Compose #-}
 
--- | Explicitly create a top-level composition expression.
 {-# DEPRECATED compose "not very useful since switching to representing hole indexes using lists." #-}
+-- | Explicitly create a top-level composition expression.
 compose :: (Monoid text, Eq text)
         => text                   -- ^ Prefix chunk
         -> (Natural,Maybe filling)           
@@ -223,18 +262,8 @@ compose c (i, Just f)  t = chunk c +> filled i f +> t
 
 -- | Decompose an expression into the top-level compose.
 decompose :: HExp text filling 
-          -> Maybe (text, (NonEmpty Natural,Maybe filling), HExp text filling)
-decompose (HExp (ICompose c i t') hlsProps) = 
-     case (i,hlsProps) of
-        (EmptyHole _ (uh,fh))
-            -> Just (c, (i,Nothing), HExp t' (uh `diff` NE.toList i,fh))
-        (FilledHole _ f (uh,fh)) 
-               -- In this case, taking the head of i is acceptable, because we
-               -- know by the pattern on this case that i is indeed a singleton
-               -- list because it represents a filled hole.
-            -> Just (c, (i,Just f),  HExp t' (uh,NE.head i `delete` fh))
-        (UndefHole  _ _)
-            -> Nothing 
+          -> Maybe (text, NonEmpty Natural, HExp text filling)
+decompose (HExp (ICompose c i t') hprops) = Just (c,i,HExp t' hprops)
 decompose _ = Nothing
 
 -- | Decide if an element of a monoid is the unit.
@@ -246,8 +275,10 @@ isUnit m | m == mempty = True
 
 -- | Test to see if an expression is empty.
 null :: (Eq text, Monoid text) => HExp text filling -> Bool
-null (HExp (IChunk c) ([],m)) | isUnit c && M.null m = True
-null _ = False
+null (HExp (IChunk c) hprops) 
+    = isUnit c && isEmptyHProps hprops
+null _ 
+    = False
 
 -- | Equality of t`IHExp`. Holes are ignored.
 (>==>) :: Eq text 
@@ -269,13 +300,16 @@ instance (Eq text, Eq filling) => Eq (HExp text filling) where
       => HExp text filling
       -> HExp text filling
       -> Bool
-(HExp t1 (hls1,fhls1)) ==> (HExp t2 (hls2,fhls2)) = t1 >==> t2 && hls1 == hls2 && fhls1 == fhls2
+(HExp t1 hprops1) ==> (HExp t2 hprops2) 
+    = t1 >==> t2 && (hprops1 `eqHProps` hprops2)
 
 -- | An empty hole.
 empty :: Monoid text
      => Natural -- ^ Hole index
      -> HExp text filling
-empty i = flip HExp ([i],M.empty) $ ICompose mempty (NL.singleton i) (IChunk mempty)
+empty i 
+    = HExp (ICompose mempty (NL.singleton i) (IChunk mempty))
+    $ emptyHolesHP %~ (i:) $ emptyHoleProps
 
 -- | A hole with a filling. 
 filled :: Monoid text
@@ -283,13 +317,14 @@ filled :: Monoid text
        -> filling -- ^ Hole filling
        -> HExp text filling
 filled i f 
-    = flip HExp ([],singleton i f) $ (ICompose mempty (NL.singleton i) (IChunk mempty))
+    = HExp (ICompose mempty (NL.singleton i) (IChunk mempty))
+    $ filledHolesHP %~ (insert i f) $ emptyHoleProps
 
 -- | A chunk is a constant; it's helpful to think of these as a piece of
 -- subtext. 
 chunk :: text -- ^ Constant
       -> HExp text filling
-chunk = flip HExp ([],M.empty) .  IChunk
+chunk = flip HExp emptyHoleProps .  IChunk
 
 -- | The empty expression.
 emptyExp :: Monoid text 
@@ -300,7 +335,7 @@ emptyExp = chunk mempty
 (>+>) :: (Monoid text, Eq text)
       => IHExp text 
       -> IHExp text 
-      -> HoleProps f
+      -> HoleProps fext
       -> IHExp text 
 (>+>) (IChunk chk1) (IChunk chk2) _   
     = IChunk $ chk1 <> chk2
@@ -308,9 +343,8 @@ emptyExp = chunk mempty
     = ICompose (chk <> p) h r
 (>+>) (ICompose p h r) t hprops 
     = case r >+> t $ hprops of
-        ICompose p' h' t' | p' == mempty && emptyHole h hprops
-                                         && emptyHole h' hprops 
-                         -> ICompose p (NL.append h h') t'
+        ICompose p' h' t' 
+         | p' == mempty -> ICompose p (NL.append h h') t'
         exp -> ICompose p h exp
 
 -- | Composition of holey expressions.
@@ -318,8 +352,8 @@ emptyExp = chunk mempty
      => HExp text filling
      -> HExp text filling
      -> HExp text filling
-(HExp t1 (ufhs1,fhs1)) +> (HExp t2 (ufhs2,fhs2)) 
-    = let hprops = (ufhs1 `L.union` ufhs2,fhs1 `M.union` fhs2)  
+(HExp t1 hprops1) +> (HExp t2 hprops2) 
+    = let hprops = hprops1 `union` hprops2
        in HExp (t1 >+> t2 $ hprops) hprops
 
 instance (Monoid text, Eq text) => Semigroup (HExp text filling) where
@@ -335,7 +369,12 @@ instance (Monoid text, Eq text) => Monoid (HExp text filling) where
 
 instance Functor (HExp text) where
     fmap :: (filling1 -> filling2) -> HExp text filling1 -> HExp text filling2
-    fmap f (HExp t (hls,fhls)) = HExp t $ (hls,M.map f fhls)
+    fmap f (HExp t (MkHProps eHP fHP pHP)) 
+        = HExp t $ MkHProps { 
+           _emptyHolesHP  = eHP
+          ,_filledHolesHP = (M.map f fHP)
+          ,_pluggedHoleHP = (M.map f pHP)
+        }
 
 instance IsString text => IsString (HExp text filling) where
     fromString :: String -> HExp text filling
@@ -369,6 +408,7 @@ instance TextLike () where
     toText :: () -> Text
     toText = DT.show
 
+{-
 -- | Convert a holey expression's AST into a `Text`. The `Show` instance for
 -- t`HExp` is set to pretty print, but for debugging it is sometimes useful to
 -- see the raw AST.
@@ -395,49 +435,86 @@ showAST (HExp (ICompose p i r) hls@(_,fhls)) = "ICompose "
 -- | Prints the AST of an expression to the terminal. This is useful for debugging.
 printAST :: (TextLike text, TextLike filling) => HExp text filling -> IO ()
 printAST = putStrLn . DT.unpack . showAST 
+-}
 
--- | Get the list of unfilled-hole indices present in an expression.
+-- | Get the list of empty-hole indices present in an expression.
 -- Time complexity: \( \mathcal{O}(0) \)
 unfilledHoles :: HExp text filling -- ^ HExp 
               -> [Natural]
-unfilledHoles (HExp _ (hls,_)) = hls
+unfilledHoles (HExp _ hprops) = hprops ^. emptyHolesHP
 
 -- | Get the list of filled-hole indices present in an expression.
 -- Time complexity: \( \mathcal{O}(n) \)
 filledHoles :: HExp text filling -- ^ HExp 
             -> [Natural]
-filledHoles (HExp _ (_,fhls)) = keys fhls
+filledHoles (HExp _ hprops) = keys $ hprops ^. filledHolesHP
+
+-- | Get the list of plugged-hole indices present in an expression.
+-- Time complexity: \( \mathcal{O}(n) \)
+pluggedHoles :: HExp text filling -- ^ HExp 
+             -> [Natural]
+pluggedHoles (HExp _ hprops) = keys $ hprops ^. pluggedHolesHP
 
 -- | Get the filling of a hole. Returns @Nothing@ when the hole doesn't exist.
 fillingInHole :: HExp text filling -- ^ HExp
               -> Natural           -- ^ Hole index
               -> Maybe filling
-fillingInHole (HExp _ (_,fhls)) h = fhls !? h
+fillingInHole (HExp _ hprops) h 
+    = (hprops ^. filledHolesHP) 
+   !? h
+
+-- | Get the text that is plugging a hole.
+-- Returns 'Nothing' when the hole doesn't exist.
+holePlug :: HExp text filling
+         -> Natural
+         -> Maybe filling
+holePlug (HExp _ hprops) h
+    = (hprops ^. pluggedHolesHP)
+   !? h
+
+{-# DEPRECATED numberOfUnfilledHole "renamed to numberOfEmptyHoles." #-}
+-- | Get the number of unfilled holes in an expression.
+-- Time complexity: \( \mathcal{O}(n) \)
+numberOfUnfilledHole 
+    :: HExp text filling -- ^ HExp 
+    -> Int
+numberOfUnfilledHole = numberOfEmptyHoles
 
 -- | Get the number of unfilled holes in an expression.
 -- Time complexity: \( \mathcal{O}(n) \)
-numberOfUnfilledHoles :: HExp text filling -- ^ HExp 
+numberOfEmptyHoles :: HExp text filling -- ^ HExp 
                       -> Int
-numberOfUnfilledHoles (HExp _ (hls,_)) = length hls
+numberOfEmptyHoles (HExp _ hprops) 
+    = length $ hprops ^. emptyHolesHP
 
 -- | Get the number of filled holes in an expression.
 -- Time complexity: \( \mathcal{O}(n) \)
 numberOfFilledHoles :: HExp text filling -- ^ HExp 
                     -> Int
-numberOfFilledHoles (HExp _ (_,fhls)) = M.size fhls
+numberOfFilledHoles (HExp _ hprops) 
+    = M.size $ hprops ^. filledHolesHP
+
+-- | Get the number of plugged holes in an expression.
+-- Time complexity: \( \mathcal{O}(n) \)
+numberOfPluggedHoles 
+    :: HExp text filling -- ^ HExp 
+    -> Int
+numberOfPluggedHoles (HExp _ hprops) 
+    = M.size $ hprops ^. pluggedHolesHP
 
 -- | Decide if an expression is filled or not. 
 -- Time complexity: \(\mathcal{O}(n)\)
 isFilled :: HExp text filling -> Bool
-isFilled t = numberOfUnfilledHoles t == 0
+isFilled t = numberOfEmptyHoles t == 0
 
 -- | Convert an expression with no holes, a chunk, into a text.
 -- Time complexity: \( \mathcal{O}(0) \)
 chunkToText :: HExp text filling 
             -> Maybe text
-chunkToText (HExp (IChunk c) ([],fhls)) | M.null fhls = Just c
-chunkToText _                                         = Nothing
-
+chunkToText (HExp (IChunk c) hprops) | isEmptyHProps hprops 
+    = Just c
+chunkToText _                                         
+    = Nothing
 
 -- | Like `update`, but doesn't update an already filled hole's value.
 place :: HExp text filling
@@ -445,11 +522,13 @@ place :: HExp text filling
             -> filling -- ^ Hole filling
             -> Maybe (HExp text filling)
 place t@(HExp it hlsProps) i c =
-    case (NE.singleton i,hlsProps) of
-        EmptyHole  _   (hls,fhls) -> Just $ HExp it $ (i `L.delete` hls,insert i c fhls)
-        FilledHole _ _ _          -> Just $ t
-        UndefHole  _   _          -> Nothing
+    case (i,hlsProps) of
+        EmptyHole     -> Just . HExp it $ emptyHole2Filled hlsProps i c
+        FilledHole _  -> Just t
+        PluggedHole _ -> Nothing -- Pretend we didn't find the index.
+        UndefHole     -> Nothing
 
+{-
 -- | Update a hole adding or removing a filling. If the hole is already filled,
 -- then the filling is updated with the new value. Filling a hole doesn't
 -- replace the hole, but simply puts the input @filling@ inside the hole.
@@ -591,6 +670,7 @@ plugAll (HExp t (hls,fhls)) f | M.null fhls =
         Just (IChunk c) -> Just c
         _               -> Nothing
 plugAll _ _ = Nothing
+-}
 
 -- | In the simplest form, a type @filling@ is a hole filling if it
 -- can be converted into @text@, because values of type @filling@ will
@@ -629,6 +709,7 @@ instance HoleFilling Text Integer where
     fillingToText :: Integer -> Text
     fillingToText = DT.show
 
+{-
 -- | This class is used to define generic combinators on holey expressions. Simply, this
 -- is the class of types that can be converted into a t`HExp`.
 class HoleFilling text filling => ToHExp text filling a where
@@ -666,3 +747,4 @@ betweenHExp :: (ToHExp text filling a)
             -> a                     -- ^ Value to be converted into an expression
             -> HExp text filling
 betweenHExp b a (toHExp->t) = b +> t +> a
+-}
