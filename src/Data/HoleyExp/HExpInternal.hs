@@ -472,13 +472,13 @@ holePlug (HExp _ hprops) h
     = (hprops ^. pluggedHolesHP)
    !? h
 
-{-# DEPRECATED numberOfUnfilledHole "renamed to numberOfEmptyHoles." #-}
+{-# DEPRECATED numberOfUnfilledHoles "renamed to numberOfEmptyHoles." #-}
 -- | Get the number of unfilled holes in an expression.
 -- Time complexity: \( \mathcal{O}(n) \)
-numberOfUnfilledHole 
+numberOfUnfilledHoles 
     :: HExp text filling -- ^ HExp 
     -> Int
-numberOfUnfilledHole = numberOfEmptyHoles
+numberOfUnfilledHoles = numberOfEmptyHoles
 
 -- | Get the number of unfilled holes in an expression.
 -- Time complexity: \( \mathcal{O}(n) \)
