@@ -34,6 +34,7 @@ terminals :: 'terminals_' ::=
   | nin           ::  :: notIn        {{ tex \notin }}
   | and           ::  :: andSymbol    {{ tex \cap }}
   | !             ::  :: not          {{ tex \neg }}
+  | \-/           ::  :: forall       {{ tex \forall }}
 
 formula :: formula_ ::=
   | judgement                 ::   :: judgement
@@ -41,6 +42,8 @@ formula :: formula_ ::=
   | formulai .. formulaj      ::   :: dots  
   | not ( formula )           :: M :: not
         {{ tex \neg [[formula]] }}
+  | \-/ formula :             ::   :: forall
+        {{ tex \forall [[formula]] : }}
 
 subrules
   c <:: hexp
@@ -83,6 +86,13 @@ holeOps :: '' ::=
     i in ehls
 
   defn
+  i nin ehls ::  :: notEmptyIndex :: '' {{ com index of non-empty hole }} by
+
+    isHole (i, hprops)
+    ------------------ :: not_empty
+    i nin ehls
+
+  defn
   i in fhls ::  :: filledIndex :: '' {{ com index of filled hole }} by
 
     isHole (i, hprops)
@@ -90,10 +100,23 @@ holeOps :: '' ::=
     i in fhls
 
   defn
+  i nin fhls ::  :: notFilledIndex :: '' {{ com index of non-filled hole }} by
+
+    isHole (i, hprops)
+    ------------------ :: not_filled
+    i nin fhls
+
+  defn
   |h| > 0 ::  :: oneHoleMin :: '' {{ com at least one hole exists }} by
 
     ------- :: min_one_hole
     |h| > 0
+
+  defn 
+  \-/ i : ::  :: forall :: '' {{ com for all indices i }} by
+
+    ------- :: for_all
+    \-/ i :
 
   % End of support judgments
 
@@ -101,11 +124,14 @@ holeOps :: '' ::=
   (ehls, fhls) |- [i] ::  :: filledHoles :: '' {{ com list of filled hole indices }} by
 
     isHole (i, hprops)
-    not ( i in ehls )
-    i in fhls
-    ------------------- :: filled_list
+    i nin ehls && i in fhls
+    ----------------------- :: filled_list
     (ehls, fhls) |- [i]
 
-  % Need to implement out forall 
   defn
   (ehls, fhls) |- h ::  :: emptyHole :: '' {{ com singleton list containing empty hole }} by
+
+    isHole (i, hprops)
+    \-/ i : i in ehls && i nin fhls
+    ----------------------- :: empty_hole
+    (ehls, fhls) |- h
