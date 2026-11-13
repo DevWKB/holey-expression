@@ -2,25 +2,15 @@
 Module      : HExpInternal
 Description : Internal framework for creating holey expressions
 Copyright   : (c) Harley Eades, 2026
-              (c) W⋊B, 2026
 Maintainer  : harley.eades@gmail.com
 -}
-{-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE PatternSynonyms              #-}
-{-# LANGUAGE DataKinds                    #-}
-{-# LANGUAGE TypeOperators                #-}
+{-# OPTIONS_HADDOCK hide                  #-}
 {-# LANGUAGE AllowAmbiguousTypes          #-}
-{-# LANGUAGE TypeFamilies                 #-}
 {-# LANGUAGE ScopedTypeVariables          #-}
 {-# LANGUAGE RankNTypes                   #-}
-{-# LANGUAGE BangPatterns                 #-}
-{-# LANGUAGE TupleSections                #-}
-{-# LANGUAGE PatternSynonyms              #-}
 {-# LANGUAGE MultiParamTypeClasses        #-}
 {-# LANGUAGE FlexibleInstances            #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE QuasiQuotes #-}
 module Data.HoleyExp.HExpInternal where
 import Prelude                    hiding (null)
 import Data.Text                  (Text)
