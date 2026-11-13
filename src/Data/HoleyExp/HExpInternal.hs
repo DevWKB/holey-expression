@@ -35,35 +35,36 @@ import Data.NatMap                (NatMap
                                   ,insert
                                   ,(!)
                                   ,delete
-                                  ,singleton)
+                                  )
 import Data.NatMap                qualified as M
 import Data.List.NonEmpty         (NonEmpty (..))
 import Data.List.NonEmpty         qualified as NL
-import Data.HoleyExp.Text.Helpers (parens, quotes)
-import qualified Data.List.NonEmpty as NE
-import Data.NatMap (subset, diff)
-import Control.Lens (Lens', lens, (^.))
-import Control.Lens.Setter qualified as L
+import Control.Lens               (Lens', lens, (^.))
+import Control.Lens.Setter        qualified as L
 
+-- | Internal properties of holes.
 data HoleProps f
     = MkHProps {
-     _emptyHolesHP :: [Natural]
-    ,_filledHolesHP :: NatMap f
-    ,_pluggedHoleHP :: NatMap f
+     _emptyHolesHP :: [Natural] -- ^ Index list of all empty holes
+    ,_filledHolesHP :: NatMap f -- ^ Map of all filled holes
+    ,_pluggedHoleHP :: NatMap f -- ^ Map of all plugged holes
 } 
 
+-- | Lens for getting/setting the empty-holes hole property.
 emptyHolesHP :: Lens' (HoleProps f) [Natural]
 emptyHolesHP 
     = lens _emptyHolesHP 
     $ \(MkHProps _ fHP pHP ) eHP' 
         -> MkHProps eHP' fHP pHP
 
+-- | Lens for getting/setting the filled-holes hole property.
 filledHolesHP :: Lens' (HoleProps f) (NatMap f)
 filledHolesHP 
     = lens _filledHolesHP
     $ \(MkHProps eHP _ pHP ) fHP' 
         -> MkHProps eHP fHP' pHP
 
+-- | Lens for getting/setting the plugged-holes hole property.
 pluggedHolesHP :: Lens' (HoleProps f) (NatMap f)
 pluggedHolesHP 
     = lens _pluggedHoleHP
@@ -74,6 +75,7 @@ pluggedHolesHP
 (%~) :: Lens' (HoleProps f) a -> (a -> a) -> (HoleProps f -> HoleProps f)
 (%~) l f = (L.%~) l f
 
+-- | Predicate that returns 'True' when the input 'HoleProps' is empty.
 isEmptyHProps :: HoleProps f -> Bool
 isEmptyHProps hprops 
     = L.null (hprops ^. emptyHolesHP)
@@ -106,6 +108,42 @@ emptyHole2Filled hprops hindex filling
     $ filledHolesHP %~ (insert hindex filling)
     $ hprops
 
+-- | The opposite of 'emptyHole2Filled'.
+filledHole2Empty 
+    :: HoleProps f
+    -> Natural
+    -> HoleProps f
+filledHole2Empty hprops hindex
+    = emptyHolesHP  %~ (L.insert hindex) 
+    $ filledHolesHP %~ (delete hindex)
+    $ hprops
+
+-- | Moves an empty hole to a plugged hole.
+emptyHole2Plugged 
+    :: Natural     -- ^ Index of the empty hole
+    -> f           -- ^ Filling
+    -> HoleProps f
+    -> HoleProps f
+emptyHole2Plugged hindex filling hprops
+    = emptyHolesHP  %~ (L.delete hindex)
+    $ pluggedHolesHP %~ (insert hindex filling)
+    $ hprops
+
+-- | Moves an empty hole to a plugged hole.
+filledHole2Plugged 
+    :: Natural     -- ^ Index of the empty hole
+    -> HoleProps f
+    -> HoleProps f
+filledHole2Plugged hindex hprops
+    = let filling_ = (hprops ^. filledHolesHP) !? hindex
+       in maybe 
+            hprops
+            (\filling -> 
+                  filledHolesHP  %~ (M.delete hindex)
+                $ pluggedHolesHP %~ (insert hindex filling)
+                $ hprops)
+            filling_
+
 -- | A hole that can be filled with a filling of type @f@ is essentially a
 -- natural number and a set of hole properties (t`HoleProps`).
 type Hole f = (Natural,HoleProps f)
@@ -118,7 +156,7 @@ pattern EmptyHole <- (decomposeEmptyHole -> True)
 
 -- | Determines if the input hole index @i@ is the index of an empty hole.
 decomposeEmptyHole :: (Natural, HoleProps f) -> Bool
-decomposeEmptyHole (i,hlsProps) = i `elem` hlsProps ^. emptyHolesHP                                  
+decomposeEmptyHole (i,hprops) = i `elem` hprops ^. emptyHolesHP                                  
 
 -- | Pattern synonym for filled holes.
 pattern FilledHole :: f -> Hole f
@@ -521,156 +559,113 @@ place :: HExp text filling
             -> Natural -- ^ Hole index to plug
             -> filling -- ^ Hole filling
             -> Maybe (HExp text filling)
-place t@(HExp it hlsProps) i c =
-    case (i,hlsProps) of
-        EmptyHole     -> Just . HExp it $ emptyHole2Filled hlsProps i c
+place t@(HExp it hprops) i c =
+    case (i,hprops) of
+        EmptyHole     -> Just . HExp it $ emptyHole2Filled hprops i c
         FilledHole _  -> Just t
         PluggedHole _ -> Nothing -- Pretend we didn't find the index.
         UndefHole     -> Nothing
 
-{-
+
 -- | Update a hole adding or removing a filling. If the hole is already filled,
 -- then the filling is updated with the new value. Filling a hole doesn't
 -- replace the hole, but simply puts the input @filling@ inside the hole.
--- Returns @Nothing@ if the hole doesn't exist. If the input filling is
--- `Nothing`, then the hole is emptied. The complexity of this operation
--- is \(\mathcal{O}(\max(n_0,\min(n_1,W)))\), where \(n_0\) is the number of
--- empty holes, and \(n_1\) is the number of filled holes with a max of \(W\)
--- the number of bits in an `Int` (32 or 64).
+-- Returns @Nothing@ if the hole doesn't exist or has already been filled. If
+-- the input filling is `Nothing`, then the hole is emptied. The complexity of
+-- this operation is \(\mathcal{O}(\max(n_0,\min(n_1,W)))\), where \(n_0\) is
+-- the number of empty holes, and \(n_1\) is the number of filled holes with a
+-- max of \(W\) the number of bits in an `Int` (32 or 64).
 update :: HExp text filling
              -> Natural       -- ^ Hole index to fill
              -> Maybe filling -- ^ Hole filling
              -> Maybe (HExp text filling)
-update (HExp t hlsProps) i Nothing = 
-    case (NE.singleton i,hlsProps) of
-        EmptyHole  _   _          -> Just $ HExp t hlsProps
-        FilledHole _ _ (hls,fhls) -> Just $ HExp t (i `L.insert` hls,delete i fhls)
-        UndefHole  _   _          -> Nothing
-update (HExp t hlsProps) i (Just c) = 
-    case (NE.singleton i,hlsProps) of
-        EmptyHole  _   (hls,fhls) -> Just $ HExp t (i `L.delete` hls,insert i c fhls)
-        FilledHole _ _ (hls,fhls) -> Just $ HExp t (hls,insert i c fhls)
-        UndefHole  _   _          -> Nothing
+update (HExp t hprops) i Nothing = 
+    case (i,hprops) of
+        EmptyHole     -> Just $ HExp t hprops
+        FilledHole  _ -> Just . HExp t $ filledHole2Empty hprops i
+        PluggedHole _ -> Nothing
+        UndefHole     -> Nothing
+update (HExp t hprops) i (Just c) = 
+    case (i,hprops) of
+        EmptyHole     -> Just . HExp t $ emptyHole2Filled hprops i c
+        FilledHole _  -> Just . HExp t $ filledHolesHP %~ (insert i c) $ hprops
+        PluggedHole _ -> Nothing
+        UndefHole     -> Nothing
 
--- | Plug an unfilled hole in an expression with some filling. Returns @Nothing@ when
+-- | Case split over a 'Hole f'.
+caseHole 
+    :: Hole f
+    -> r          -- ^ Undefined hole
+    -> r          -- ^ Empty hole
+    -> (f -> r)   -- ^ Filled hole
+    -> (f -> r)   -- ^ Plugged hole
+    -> r
+caseHole (i,hprops) onUndef onEmpty onFilled onPlugged
+    = case (i,hprops) of
+        EmptyHole     -> onEmpty
+        FilledHole f  -> onFilled f
+        PluggedHole f -> onPlugged f
+        UndefHole     -> onUndef
+
+-- | Plug an empty hole in an expression with some filling. Returns @Nothing@ when
 -- the hole index doesn't exist in the expression or is filled, otherwise returns
 -- an expression with the hole plugged. Plugging a hole replaces the hole with the
 -- value unlike `update`.
-plugHoleI :: (Monoid text, Eq text)
-          => (filling -> text)   -- ^ Function to translate fillings into text
-          -> IHExp text          -- ^ Expression to plug
-          -> [Natural]           -- ^ List of unfilled holes
-          -> Natural             -- ^ Hole index to plug
-          -> filling             -- ^ Text to replace hole
-          -> Maybe (IHExp text)
-plugHoleI toText (ICompose prefix hole suffix) emptyHoles holeIndex filling 
-    | emptyHole hole (emptyHoles,M.empty) && holeIndex `elem` hole
-        = do newSuffix <- plugHoleI toText suffix emptyHoles holeIndex filling
-             Just $ (>+>) ((>+>) (IChunk prefix) 
-                                 (expandEmptyHole emptyHoles (NE.toList hole) holeIndex (toText filling))
-                                 (emptyHoles,M.empty)) 
-                       newSuffix (emptyHoles,M.empty)
-    | otherwise = do 
-        newSuffix <- plugHoleI toText suffix emptyHoles holeIndex filling
-        pure $ ICompose prefix hole newSuffix
-plugHoleI _ _ _ _ _ = Nothing
+plug 
+    :: HExp text filling
+    -> Natural       -- ^ Hole index to fill
+    -> filling       -- ^ Hole filling
+    -> Maybe (HExp text filling)
+plug (HExp t hprops) i c = 
+    caseHole (i,hprops)
+        Nothing
+        (Just . HExp t $ emptyHole2Plugged i c hprops)
+        (const Nothing)
+        (const Nothing)
 
--- | Expands an empty hole into an @IHExp@ inserting the given filling in the
--- proper position. 
---
--- Suppose we have a hole @[1,2,3]@, filling @"F"@, and the hole index being
--- replaced is @2@, then @expandEmptyHole [1,2,3,4,5] [1,2,3] 2 "F"@ computes
--- the following:
---
--- 1. Compute the prefix hole @[1]@ and suffix hole $[3]$.
--- 2. Insert the filling between the prefix and suffix: 
---      @ICompose mempty [1] (ICompose "F" [3] (IChunk ""))@
---
--- The interesting cases are where the hole index is first, last, or repeated in
--- the hole index list.
---
--- - @expandEmptyHole  [1,2,3,4,5] [2,1,2,3] 2 "F"  = ICompose "F" (1 :| []) (ICompose "F" (3 :| []) (IChunk ""))@
--- - @expandEmptyHole  [1,2,3,4,5] [1,3,2]   2 "F"  = ICompose "" (1 :| [3]) (IChunk "F")@
--- - @expandEmptyHole  [1,2,3,4,5] [2,3,2]   2 "F"  = ICompose "F" (3 :| []) (IChunk "F")@
-expandEmptyHole 
-    :: (Monoid text,Eq text) 
-    => [Natural] -- ^ Set of allowed empty hole indexes
-    -> [Natural] -- ^ The empty hole to expand
-    -> Natural   -- ^ The hole index to replace
-    -> text      -- ^ The filling to replace the hole index with
-    -> IHExp text
-expandEmptyHole emptyHoles hole holeIndex filling      
-    = case rest of
-        -- If after removing the prefix from `hole` we get an empty list, then
-        -- there are no more hole indexes to consider, so construct the last
-        -- `IHExp`.
-        [] -> mkIHExp prefix mempty
-        -- If after removing the prefix from `hole` we get a non-empty list,
-        -- then the head of that list is `holeIndex` so skip it, and construct
-        -- the next `IHExp` and compose it with the expansion of the `suffix`.
-        (_:suffix) -> mkIHExp prefix filling
-                        >+> expandEmptyHole emptyHoles suffix holeIndex filling
-                          $ (emptyHoles,M.empty)
+-- | Plug a filled hole with its filling (committing to the filling). 
+-- Returns 'Nothing' if the hole index is empty or undefined.
+commit
+    :: HExp text filling
+    -> Natural
+    -> Maybe (HExp text filling)
+commit (HExp e hprops) i = 
+    caseHole (i,hprops)
+        Nothing
+        Nothing
+        (\f -> Just . HExp e $ filledHole2Plugged i hprops)        
+        (const Nothing)
+
+-- | Plugs every hole in an expression with no filled holes using the given plug
+-- function. If the plug function is defined for every hole in the input
+-- expression, then this function guarantees every hole is plugged.
+plugAll 
+    :: HExp text filling                         -- ^ HExp to plug
+    -> ([Natural] -> (Natural -> Maybe filling)) -- ^ Plug function
+    -> Maybe (HExp text filling)
+plugAll (HExp e hprops) plugFun' 
+    | M.null (hprops ^. filledHolesHP)
+        = do let pf acc hindex 
+                    = do hprops' <- acc
+                         filling <- plugFun hindex
+                         pure $ emptyHole2Plugged hindex filling hprops'
+             hprops' <- foldl pf (Just hprops) eHP
+             pure $ HExp e hprops'
+    | otherwise = Nothing
     where
-        -- Computes the longest prefix of hole indexes in `hole` up to
-        -- `holeIndex`, and everything after this prefix *including* the
-        -- `holeIndex`.
-        (prefix,rest) = span (not . (==holeIndex)) hole
-        -- Constructs the next `IHExp` to add to the result. If the prefix is
-        -- empty, then the `holeIndex` was at the beginning of the hole index
-        -- list, but if not, then we compose the empty hole `prefix` with the
-        -- filling.
-        mkIHExp prefix filling 
-            = case prefix of
-                    [] -> IChunk filling
-                    _  -> ICompose mempty (NE.fromList prefix) (IChunk filling)
+        eHP = hprops ^. emptyHolesHP
+        plugFun = plugFun' eHP
 
--- | Plug an unfilled hole in an expression with some filling. Returns @Nothing@ when
--- the hole index doesn't exist in the expression or is filled, otherwise returns
--- an expression with the hole plugged. Plugging a hole replaces the hole with the
--- value unlike `update`.
-plug :: HoleFilling text filling 
-         => HExp text filling
-         -> Natural   -- ^ Hole index to plug
-         -> filling   -- ^ Text to replace hole
-         -> Maybe (HExp text filling)
-plug (HExp t@(ICompose _ _ _) (hls,fhls)) i c | i `elem` hls = 
-        do t' <- plugHoleI fillingToText t hls i c
-           pure $ HExp t' (i `L.delete` hls,fhls)
-plug _ _ _ = Nothing
-
--- | Plugs every hole in an expression with no filled holes using the given plug
--- function. If the plug function is defined for every hole in the input
--- expression, then this function guarantees an expression with no holes (a constant).
-plugAllI 
-    :: Semigroup text
-    => (filling -> text)
-    -> [Natural]
-    -> (Natural -> Maybe filling)  -- ^ Plug function.
-    -> IHExp text              -- ^ IHExp to plug.
-    -> Maybe (IHExp text)
-plugAllI toText hls f (ICompose chk i r) = undefined 
-{- | i `elem` hls = do
-    chk' <- f i
-    IChunk chk'' <- plugAllI toText hls f r
-    return . IChunk $ chk <> toText chk' <> chk'' -}
-plugAllI _ _ _ (ICompose _ _ _) = Nothing
-plugAllI _ _ _ t@(IChunk _) = return t
-
--- | Plugs every hole in an expression with no filled holes using the given plug
--- function. If the plug function is defined for every hole in the input
--- expression, then this function guarantees an expression with no holes (a constant) is
--- returned.
-plugAll :: HoleFilling text filling 
-        => HExp text filling                         -- ^ HExp to plug
-        -> ([Natural] -> (Natural -> Maybe filling)) -- ^ Plug function
-        -> Maybe text
-plugAll (HExp t (hls,fhls)) f | M.null fhls = 
-    case plugAllI fillingToText hls (f hls) t of        
-        Just (IChunk c) -> Just c
-        _               -> Nothing
-plugAll _ _ = Nothing
--}
+-- | Commits every filled hole in the given expression. 
+-- Empty holes are left untouched.
+commitAll 
+    :: HExp text filling -- ^ HExp to commit
+    -> HExp text filling
+commitAll (HExp e hprops) 
+    = let pf acc hindex = filledHole2Plugged hindex acc
+       in HExp e $ foldl pf hprops fHP
+    where
+        fHP = keys (hprops ^. filledHolesHP)
 
 -- | In the simplest form, a type @filling@ is a hole filling if it
 -- can be converted into @text@, because values of type @filling@ will
@@ -709,7 +704,6 @@ instance HoleFilling Text Integer where
     fillingToText :: Integer -> Text
     fillingToText = DT.show
 
-{-
 -- | This class is used to define generic combinators on holey expressions. Simply, this
 -- is the class of types that can be converted into a t`HExp`.
 class HoleFilling text filling => ToHExp text filling a where
@@ -747,4 +741,3 @@ betweenHExp :: (ToHExp text filling a)
             -> a                     -- ^ Value to be converted into an expression
             -> HExp text filling
 betweenHExp b a (toHExp->t) = b +> t +> a
--}
