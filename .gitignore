@@ -13,3 +13,4 @@ spec-inc.tex
 *.fdb_latexmk
 *.synctex.gz
 *.bbl
+*.blg
