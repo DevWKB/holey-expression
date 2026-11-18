@@ -38,16 +38,15 @@ terminals :: 'terminals_' ::=
 formula :: formula_ ::=
   | judgement                   ::   :: judgement
   | judgement1 && judgement2    ::   :: judgements
-        {{ tex [[judgement1]] \land [[judgement2]] }}
+        {{ tex [[judgement1]] \quad [[judgement2]] }}
   | formulai .. formulaj        ::   :: dots  
   | not ( formula )             :: M :: not
         {{ tex \neg [[formula]] }}
   | \-/ formula :               ::   :: forall
-        {{ tex \forall [[formula]] : }}
+        {{ tex \forall [[formula]] : }}  
 
 subrules
   c <:: hexp
-
 
 % Judgements on expressions
 defns
@@ -129,16 +128,13 @@ holes :: '' ::=
   % End of support judgments----------------------------------------------
 
   defn
-  (ehls, fhls) |- [i] ::  :: filledHoles :: '' {{ com list of filled hole indices }} by
- 
-    i nin ehls && i in fhls
-    ----------------------- :: filled_list
-    (ehls, fhls) |- [i]
-
-  defn
   (ehls, fhls) |- h ::  :: singleEmptyHole :: '' {{ com singleton list containing empty hole }} by
 
     \-/ i in h: i in ehls && i nin fhls
     |h| > 0
     ----------------------------------- :: singleton_empty
     (ehls, fhls) |- h
+
+    i nin ehls && i in fhls
+    ----------------------- :: filled_list
+    (ehls, fhls) |- [i]
