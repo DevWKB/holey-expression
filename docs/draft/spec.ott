@@ -3,16 +3,15 @@ embed
                  \usepackage{stmaryrd}
                  \usepackage{relsize} }}
 
-metavar termvar, x, y , z, f  ::=
-metavar semiringEl, r , s ::=
+metavar termvar, x, f, r, s, t ::=
 metavar type, T , S ::=
 indexvar i , j ::=
 
 
 grammar
 hexp, e :: 'e_' ::=
-  | chunk r                   ::  :: Chunk
-  | compose r x e             ::  :: Compose
+  | chunk t                   ::  :: Chunk
+  | compose t x e             ::  :: Compose
   | ( e )                     :: S :: Parens
 
 holeprops, hp :: 'hprops_' ::=
@@ -24,7 +23,7 @@ hole, h :: 'h_' ::=
 
 % This is a comment
 c :: 'c_' ::=                                   {{ com chunk subgrammar}}
-  | chunk r                   ::  :: Chunk
+  | chunk t                   ::  :: Chunk
 
 terminals :: 'terminals_' ::=
   | |-            ::  :: turnstile    {{ tex \vdash }}
@@ -37,18 +36,20 @@ terminals :: 'terminals_' ::=
   | \-/           ::  :: forall       {{ tex \forall }}
 
 formula :: formula_ ::=
-  | judgement                 ::   :: judgement
-  | judgement1 && judgement2  ::   :: judgements
+  | judgement                   ::   :: judgement
+  | judgement1 && judgement2    ::   :: judgements
         {{ tex [[judgement1]] \land [[judgement2]] }}
-  | formulai .. formulaj      ::   :: dots  
-  | not ( formula )           :: M :: not
+  | formulai .. formulaj        ::   :: dots  
+  | not ( formula )             :: M :: not
         {{ tex \neg [[formula]] }}
-  | \-/ formula :             ::   :: forall
+  | \-/ formula :               ::   :: forall
         {{ tex \forall [[formula]] : }}
 
 subrules
   c <:: hexp
 
+
+% Judgements on expressions
 defns
 
 isHExp :: '' ::=
@@ -57,7 +58,7 @@ isHExp :: '' ::=
   isChunk e ::  :: isChunk :: '' {{ com HExp is a chunk }} by
 
     ----------------- :: Chunk
-    isChunk (chunk r)
+    isChunk (chunk t)
 
   defn
   hprops |- e ::  :: isComposed :: '' {{ com HExp is composed of text, an index, and a HExp }}  by
@@ -65,14 +66,14 @@ isHExp :: '' ::=
     % Trying to use && here leads to multiple parses
     hprops |- e && isChunk e
     ------------------------ :: Compose
-    hprops |- compose r x e
+    hprops |- compose t x e
 
-% holeOps definitions below
+
+% Judgements on holes
 defns
 
-holeOps :: '' ::=
+holes :: '' ::=
 
-  % Support judgements
   defn
   isHoleList h ::  :: isHoleList :: '' {{ com is a list of holes }} by
 
@@ -80,32 +81,36 @@ holeOps :: '' ::=
     isHoleList h
 
   defn
-  i in ehls ::  :: emptyIndex :: '' {{ com index of empty hole }} by
+  i in ehls ::  :: emptyHole :: '' {{ com index of empty hole }} by
 
     isHoleList (i, hprops)
-    ---------------------- :: empty
+    ---------------------- :: empty_hole
     i in ehls
 
   defn
-  i nin ehls ::  :: notEmptyIndex :: '' {{ com index of non-empty hole }} by
+  i in fhls ::  :: filledHole :: '' {{ com index of filled hole }} by
 
     isHoleList (i, hprops)
-    ---------------------- :: not_empty
+    ---------------------- :: filled_hole
+    i in fhls
+
+  %----------------------------------------------------------------------------
+  % Judgements of negation
+  % May not be necessary if opting to use `not` operator with their non-negated counterparts
+  defn
+  i nin ehls ::  :: notEmptyHole :: '' {{ com index of non-empty hole }} by
+
+    isHoleList (i, hprops)
+    ---------------------- :: not_empty_hole
     i nin ehls
 
   defn
-  i in fhls ::  :: filledIndex :: '' {{ com index of filled hole }} by
+  i nin fhls ::  :: notFilledHole :: '' {{ com index of non-filled hole }} by
 
     isHoleList (i, hprops)
-    ---------------------- :: filled
-    i in fhls
-
-  defn
-  i nin fhls ::  :: notFilledIndex :: '' {{ com index of non-filled hole }} by
-
-    isHoleList (i, hprops)
-    ---------------------- :: not_filled
+    ---------------------- :: not_filled_hole
     i nin fhls
+  %----------------------------------------------------------------------------
 
   defn
   |h| > 0 ::  :: oneHoleMin :: '' {{ com at least one hole exists }} by
@@ -113,27 +118,27 @@ holeOps :: '' ::=
     ------- :: min_one_hole
     |h| > 0
 
+  % Support judgement; mostly a workaround for a formula, need to replace------
+  
   defn 
   \-/ i in h: ::  :: forall :: '' {{ com for all indices i in h }} by
 
     ----------- :: for_all
     \-/ i in h:
 
-  % End of support judgments
+  % End of support judgments----------------------------------------------
 
   defn
   (ehls, fhls) |- [i] ::  :: filledHoles :: '' {{ com list of filled hole indices }} by
-
-    
+ 
     i nin ehls && i in fhls
     ----------------------- :: filled_list
     (ehls, fhls) |- [i]
 
   defn
-  (ehls, fhls) |- h ::  :: emptyHole :: '' {{ com singleton list containing empty hole }} by
+  (ehls, fhls) |- h ::  :: singleEmptyHole :: '' {{ com singleton list containing empty hole }} by
 
-    
     \-/ i in h: i in ehls && i nin fhls
     |h| > 0
-    ----------------------------------- :: empty_hole
+    ----------------------------------- :: singleton_empty
     (ehls, fhls) |- h
