@@ -2,5 +2,15 @@
     "cSpell.words": [
         "Hask",
         "JTPE"
-    ]
+    ],
+    "[haskell]": {
+        "editor.rulers": [
+            80
+        ]
+    },
+    "[ott]": {
+        "editor.rulers": [
+            80
+        ]
+    }
 }
