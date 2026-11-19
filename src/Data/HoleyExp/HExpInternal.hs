@@ -637,7 +637,7 @@ commit (HExp e hprops) i =
     caseHole (i,hprops)
         Nothing
         Nothing
-        (\f -> Just . HExp e $ filledHole2Plugged i hprops)        
+        (\_ -> Just . HExp e $ filledHole2Plugged i hprops)        
         (const Nothing)
 
 -- | Plugs every hole in an expression with no filled holes using the given plug
@@ -705,13 +705,20 @@ parseHoleFilling suffix
                  (MP.string suffix))
 
 match 
+    :: TextLike text 
+    => HExp text filling 
+    -> Text 
+    -> Maybe ()
+match (HExp exp hprops) = MP.parseMaybe $ imatch exp hprops
+
+imatch 
     :: (TextLike text)
     => IHExp text
     -> HoleProps filling
     -> Parser ()
-match (IChunk _c@(toText->c')) _ 
+imatch (IChunk _c@(toText->c')) _ 
     = void $ MP.string c'
-match (ICompose _prefix@(toText->prefix') _hls exp') hprops 
+imatch (ICompose _prefix@(toText->prefix') _hls exp') hprops 
     = MP.string prefix' 
     *> (parseHoleFilling . toText $ suffix exp')
     *> continue exp'
@@ -721,7 +728,7 @@ match (ICompose _prefix@(toText->prefix') _hls exp') hprops
 
         continue :: (TextLike text) => IHExp text-> Parser ()
         continue (IChunk _) = pure ()
-        continue (ICompose _ _ exp'') = match exp'' hprops
+        continue (ICompose _ _ exp'') = imatch exp'' hprops
 
 -- | In the simplest form, a type @filling@ is a hole filling if it
 -- can be converted into @text@, because values of type @filling@ will
@@ -753,6 +760,10 @@ instance HoleFilling Text Integer where
     fillingToText :: Integer -> Text
     fillingToText = DT.show
 
+instance HoleFilling String String where
+  fillingToText :: String -> String
+  fillingToText = id
+    
 -- | This class is used to define generic combinators on holey expressions.
 -- Simply, this is the class of types that can be converted into a t`HExp`.
 class HoleFilling text filling => ToHExp text filling a where
