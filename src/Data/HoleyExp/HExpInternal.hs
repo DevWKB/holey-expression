@@ -31,6 +31,10 @@ import Data.List.NonEmpty         (NonEmpty (..))
 import Data.List.NonEmpty         qualified as NL
 import Control.Lens               (Lens', lens, (^.))
 import Control.Lens.Setter        qualified as L
+import Text.Megaparsec            qualified as MP
+import Text.Megaparsec.Char       qualified as MP
+import Control.Monad              (void)
+import Data.Void (Void)
 
 -- | Internal properties of holes.
 data HoleProps f
@@ -692,6 +696,33 @@ commitAll (HExp e hprops)
     where
         fHP = keys (hprops ^. filledHolesHP)
 
+type Parser = MP.Parsec Void Text
+
+parseHoleFilling :: Text -> Parser ()
+parseHoleFilling suffix
+    = void $ (MP.skipManyTill 
+                 MP.anySingle
+                 (MP.string suffix))
+
+match 
+    :: (TextLike text)
+    => IHExp text
+    -> HoleProps filling
+    -> Parser ()
+match (IChunk _c@(toText->c')) _ 
+    = void $ MP.string c'
+match (ICompose _prefix@(toText->prefix') _hls exp') hprops 
+    = MP.string prefix' 
+    *> (parseHoleFilling . toText $ suffix exp')
+    *> continue exp'
+    where
+        suffix (IChunk c)       = c
+        suffix (ICompose p _ _) = p
+
+        continue :: (TextLike text) => IHExp text-> Parser ()
+        continue (IChunk _) = pure ()
+        continue (ICompose _ _ exp'') = match exp'' hprops
+
 -- | In the simplest form, a type @filling@ is a hole filling if it
 -- can be converted into @text@, because values of type @filling@ will
 -- ultimately plug the hole they are filling. Optionally, a parser from t`Text`
@@ -703,13 +734,6 @@ class (Monoid text,Eq text,Eq filling) => HoleFilling text filling  where
 
     parseFilling :: Maybe (Text -> Either Text filling)
     parseFilling = Nothing    
-
-instance HoleFilling Text Text where
-    fillingToText :: Text -> Text
-    fillingToText = id
-
-    parseFilling :: Maybe(Text -> Either Text Text)
-    parseFilling = Just Right
 
 instance HoleFilling Text String where
     fillingToText :: String -> Text
@@ -763,7 +787,7 @@ sepHExpsBy sep (v:vs) = toHExp v +> sep +> sepHExpsBy sep vs
 -- | Add a prefix and suffix holey expressions to the given value.
 betweenHExp :: (ToHExp text filling a) 
             => HExp text filling -- ^ Prefix expression
-            -> HExp text filling -- ^ Suffice expression
+            -> HExp text filling -- ^ Suffix expression
             -> a                 -- ^ Value to be converted into an expression
             -> HExp text filling
 betweenHExp b a (toHExp->t) = b +> t +> a

@@ -237,16 +237,16 @@ holeParser = do
 chunkParser :: IsString text => Parser text
 chunkParser = fromString <$> many (hExpCharParser False)
 
--- | Parse an expression either as a `Chunk` or a `Compose`.
+-- | Parse an expression either as a 'chunk' or a '(+>)'.
 hExpParser :: HoleFilling Text filling => Parser (HExp Text filling)
 hExpParser = do
     mc <- chunkParser
     isEnd <- atEnd
     if isEnd
-    then pure . Chunk $ mc
-    else do h <- holeParser
+    then pure . chunk $ mc
+    else do (h,filling_) <- holeParser
             t <- hExpParser
-            pure $ Compose mc h t
+            pure $ (chunk mc) +> (maybe (empty h) (filled h) filling_) +> t
 
 -- | Parse an expression character. These are any unicode character where the
 -- characters 

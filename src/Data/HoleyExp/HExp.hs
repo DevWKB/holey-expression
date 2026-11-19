@@ -186,7 +186,7 @@ module  Data.HoleyExp.HExp (-- * Holey Expressions
                            -- __* Equality
                            ,(==>)
                            -- __* Useful Helpers
-                           ,showAST
+                           --,showAST
                            ,sepHExpsBy
                            ,betweenHExp
                            ,chunkToText) where
