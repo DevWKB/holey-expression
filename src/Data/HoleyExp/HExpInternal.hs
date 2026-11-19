@@ -110,11 +110,11 @@ filledHole2Empty hprops hindex
 
 -- | Moves an empty hole to a plugged hole.
 emptyHole2Plugged 
-    :: Natural     -- ^ Index of the empty hole
+    :: HoleProps f    
+    -> Natural     -- ^ Index of the empty hole
     -> f           -- ^ Filling
     -> HoleProps f
-    -> HoleProps f
-emptyHole2Plugged hindex filling hprops
+emptyHole2Plugged hprops hindex filling
     = emptyHolesHP  %~ (L.delete hindex)
     $ pluggedHolesHP %~ (insert hindex filling)
     $ hprops
@@ -164,8 +164,8 @@ pattern PluggedHole t <- (decomposePluggedHole -> Just t)
 decomposePluggedHole :: Hole f -> Maybe f
 decomposePluggedHole (i,hprops) = (hprops ^. pluggedHolesHP) !? i
 
--- | Pattern synonym for undefined holes. These are holes which are not currently used
--- in the expression; and thus, are neither free nor empty.
+-- | Pattern synonym for undefined holes. These are holes which are not
+-- currently used in the expression; and thus, are neither free nor empty.
 pattern UndefHole :: Hole f
 pattern UndefHole <- (decomposeUndefHole -> True)
 
@@ -191,7 +191,10 @@ isFreshHoleIndex h holeProps
 
 -- | The hole properties with no defined holes.
 emptyHoleProps :: HoleProps f
-emptyHoleProps = MkHProps [] M.empty M.empty
+emptyHoleProps 
+    = MkHProps {_emptyHolesHP  = []
+               ,_filledHolesHP = M.empty
+               ,_pluggedHoleHP = M.empty }
 
 -- | The underlying structure of t'HExp'.
 data IHExp text where
@@ -214,10 +217,14 @@ instance (TextLike text, HoleFilling text filling)
         = (DT.unpack . toText $ prefix)     
         <> (foldl (\acc hindex -> 
                     case (hindex,hprops) of
-                        EmptyHole     -> acc <> mkHoleText hindex Nothing
-                        FilledHole  _ -> acc <> (mkHoleText hindex $ (hprops ^. filledHolesHP) !? hindex) <> ")"
-                        PluggedHole _ -> fToS $ (hprops ^. pluggedHolesHP) ! hindex
-                        UndefHole     -> error "unrecognized hole index: " <> show hindex) 
+                        EmptyHole     -> acc 
+                                      <> mkHoleText hindex hprops
+                        FilledHole  _ -> acc 
+                                      <> (mkHoleText hindex hprops) 
+                        PluggedHole _ -> fToS 
+                                       $ (hprops ^. pluggedHolesHP) ! hindex
+                        UndefHole     -> error "unrecognized hole index: " 
+                                      <> show hindex) 
                   "" 
                   holeIndexList)
         <> show (HExp rest hprops)
@@ -227,12 +234,13 @@ instance (TextLike text, HoleFilling text filling)
 
             fToS = DT.unpack . toText . fToT
 
-            mkHoleText :: Natural -> Maybe filling -> String
-            mkHoleText hindex filling
-                = "$" <> show hindex 
-                      <> "("
-                      <> maybe "" fToS filling 
-                      <> ")"            
+            mkHoleText :: Natural -> HoleProps filling -> String
+            mkHoleText hindex hprops'
+                = let filling = (hprops' ^. filledHolesHP) !? hindex
+                   in "$" <> show hindex 
+                          <> "("
+                          <> maybe "" fToS filling
+                          <> ")"            
 -- * Combinators
 
 -- | Pattern synonym for the empty expression.
@@ -264,7 +272,8 @@ fromHoleIndexList h hprops
                         EmptyHole     -> empty hindex
                         FilledHole f  -> filled hindex f
                         PluggedHole t -> chunk . fillingToText $ t
-                        UndefHole     -> error $ "unrecognized hole index: "<>show hindex) 
+                        UndefHole     -> error $ "unrecognized hole index: "
+                                      <> show hindex) 
             emptyExp 
             h
 
@@ -278,8 +287,9 @@ pattern Compose c h t <- (decompose -> Just (c, h, t))
 
 {-# COMPLETE Chunk, Compose #-}
 
-{-# DEPRECATED compose "not very useful since switching to representing hole indexes using lists." #-}
 -- | Explicitly create a top-level composition expression.
+{-# DEPRECATED compose "compose has bad performance, \ 
+                       \use (+>) instead." #-}
 compose :: (Monoid text, Eq text)
         => text                   -- ^ Prefix chunk
         -> (Natural,Maybe filling)           
@@ -321,9 +331,9 @@ instance (Eq text, Eq filling) => Eq (HExp text filling) where
     (==) :: HExp text filling -> HExp text filling -> Bool
     (==) = (==>)
 
--- | Equality of holey expressions. Two holey expressions are considered equivalent if and only
--- if they differ by hole labels only. The contents of filled holes are included
--- in the decision.
+-- | Equality of holey expressions. Two holey expressions are considered
+-- equivalent if and only if they differ by hole labels only. The contents of
+-- filled holes are included in the decision.
 (==>) :: (Eq text,Eq filling)
       => HExp text filling
       -> HExp text filling
@@ -500,9 +510,9 @@ holePlug (HExp _ hprops) h
     = (hprops ^. pluggedHolesHP)
    !? h
 
-{-# DEPRECATED numberOfUnfilledHoles "renamed to numberOfEmptyHoles." #-}
 -- | Get the number of unfilled holes in an expression.
 -- Time complexity: \( \mathcal{O}(n) \)
+{-# DEPRECATED numberOfUnfilledHoles "renamed to numberOfEmptyHoles." #-}
 numberOfUnfilledHoles 
     :: HExp text filling -- ^ HExp 
     -> Int
@@ -597,10 +607,10 @@ caseHole (i,hprops) onUndef onEmpty onFilled onPlugged
         PluggedHole f -> onPlugged f
         UndefHole     -> onUndef
 
--- | Plug an empty hole in an expression with some filling. Returns @Nothing@ when
--- the hole index doesn't exist in the expression or is filled, otherwise returns
--- an expression with the hole plugged. Plugging a hole replaces the hole with the
--- value unlike `update`.
+-- | Plug an empty hole in an expression with some filling. Returns 'Nothing'
+-- when the hole index doesn't exist in the expression or is filled, otherwise
+-- returns an expression with the hole plugged. Plugging a hole replaces the
+-- hole with the value unlike 'update'.
 plug 
     :: HExp text filling
     -> Natural       -- ^ Hole index to fill
@@ -609,7 +619,7 @@ plug
 plug (HExp t hprops) i c = 
     caseHole (i,hprops)
         Nothing
-        (Just . HExp t $ emptyHole2Plugged i c hprops)
+        (Just . HExp t $ emptyHole2Plugged hprops i c)
         (const Nothing)
         (const Nothing)
 
@@ -628,7 +638,9 @@ commit (HExp e hprops) i =
 
 -- | Plugs every hole in an expression with no filled holes using the given plug
 -- function. If the plug function is defined for every hole in the input
--- expression, then this function guarantees every hole is plugged.
+-- expression, then this function guarantees every hole is plugged. Return
+-- 'Nothing' if the hole function yields 'Nothing' on any hole index. Use
+-- 'plugSome' if this is undesirable.
 plugAll 
     :: HExp text filling                         -- ^ HExp to plug
     -> ([Natural] -> (Natural -> Maybe filling)) -- ^ Plug function
@@ -638,10 +650,33 @@ plugAll (HExp e hprops) plugFun'
         = do let pf acc hindex 
                     = do hprops' <- acc
                          filling <- plugFun hindex
-                         pure $ emptyHole2Plugged hindex filling hprops'
+                         pure $ emptyHole2Plugged hprops' hindex filling
              hprops' <- foldl pf (Just hprops) eHP
              pure $ HExp e hprops'
     | otherwise = Nothing
+    where
+        eHP = hprops ^. emptyHolesHP
+        plugFun = plugFun' eHP
+
+-- | Plugs every empty hole defined by the given plug function. Filled holes are
+-- left untouched. 
+plugSome 
+    :: HExp text filling                         -- ^ HExp to plug
+    -> ([Natural] -> (Natural -> Maybe filling)) -- ^ Plug function
+    -> Maybe (HExp text filling)
+plugSome (HExp e hprops) plugFun' 
+        = do let pf acc hindex 
+                    = do -- Just to 'Nothing' if we have a problem with the hole 
+                         -- props.
+                         hprops' <- acc
+                         -- Case splitting here instead of using bind ensures
+                         -- that we keep trying to plug holes when the plug
+                         -- function returns 'Nothing'. 
+                         pure $ maybe hprops'
+                                      (emptyHole2Plugged hprops' hindex)
+                                      (plugFun hindex) 
+             hprops' <- foldl pf (Just hprops) eHP
+             pure $ HExp e hprops'
     where
         eHP = hprops ^. emptyHolesHP
         plugFun = plugFun' eHP
@@ -694,8 +729,8 @@ instance HoleFilling Text Integer where
     fillingToText :: Integer -> Text
     fillingToText = DT.show
 
--- | This class is used to define generic combinators on holey expressions. Simply, this
--- is the class of types that can be converted into a t`HExp`.
+-- | This class is used to define generic combinators on holey expressions.
+-- Simply, this is the class of types that can be converted into a t`HExp`.
 class HoleFilling text filling => ToHExp text filling a where
     toHExp :: a -> HExp text filling
 
@@ -705,7 +740,8 @@ data Proxy filling r = Proxy {
     runProxy :: r
 }
 
-instance (ToHExp text filling a) => ToHExp text filling (Either (HExp text filling) a) where
+instance (ToHExp text filling a) 
+      => ToHExp text filling (Either (HExp text filling) a) where
     toHExp :: Either (HExp text filling) a -> HExp text filling
     toHExp (Left t)  = t
     toHExp (Right a) = toHExp a
@@ -714,8 +750,8 @@ instance (Monoid text, Eq text) => HoleFilling text () where
     fillingToText :: () -> text
     fillingToText () = mempty
 
--- | Translates a list into an expression list where each expression in the input
--- list is separated by the input expression.
+-- | Translates a list into an expression list where each expression in the
+-- input list is separated by the input expression.
 sepHExpsBy :: (ToHExp text filling a)
            => HExp text filling   -- ^ Separator
            -> [a]                 -- ^ List of holey expressions
@@ -726,8 +762,8 @@ sepHExpsBy sep (v:vs) = toHExp v +> sep +> sepHExpsBy sep vs
 
 -- | Add a prefix and suffix holey expressions to the given value.
 betweenHExp :: (ToHExp text filling a) 
-            => HExp text filling     -- ^ Prefix expression
-            -> HExp text filling     -- ^ Suffice expression
-            -> a                     -- ^ Value to be converted into an expression
+            => HExp text filling -- ^ Prefix expression
+            -> HExp text filling -- ^ Suffice expression
+            -> a                 -- ^ Value to be converted into an expression
             -> HExp text filling
 betweenHExp b a (toHExp->t) = b +> t +> a
