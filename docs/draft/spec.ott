@@ -3,7 +3,8 @@ embed
                  \usepackage{stmaryrd}
                  \usepackage{relsize} }}
 
-metavar termvar, x, f, r, s, t ::=
+metavar termvar, x, f, m, s, t ::=
+metavar monvar, m, id ::=
 metavar type, T , S ::=
 indexvar i , j ::=
 
@@ -18,10 +19,10 @@ holeprops, hp :: 'hprops_' ::=
   | ( xi .. xj , s )          ::  :: Struc      {{ com structure }}
   | hprops f                  ::  :: App        {{ com application }}
 
+% Re-define hole as list
 hole, h :: 'h_' ::=
   | ( i , hprops )            ::  :: Struc      {{ com structure }}
 
-% This is a comment
 c :: 'c_' ::=                                   {{ com chunk subgrammar}}
   | chunk t                   ::  :: Chunk
 
@@ -38,20 +39,21 @@ terminals :: 'terminals_' ::=
 formula :: formula_ ::=
   | judgement                   ::   :: judgement
   | judgement1 && judgement2    ::   :: judgements
-        {{ tex [[judgement1]] \quad [[judgement2]] }}
+        {{ tex [[judgement1]] \land [[judgement2]] }}
   | formulai .. formulaj        ::   :: dots  
   | not ( formula )             :: M :: not
         {{ tex \neg [[formula]] }}
   | \-/ formula :               ::   :: forall
-        {{ tex \forall [[formula]] : }}  
+        {{ tex \forall [[formula]] : }}
 
 subrules
   c <:: hexp
 
+
 % Judgements on expressions
 defns
 
-isHExp :: '' ::=
+HExp :: '' ::=
 
   defn
   isChunk e ::  :: isChunk :: '' {{ com HExp is a chunk }} by
@@ -62,11 +64,27 @@ isHExp :: '' ::=
   defn
   hprops |- e ::  :: isComposed :: '' {{ com HExp is composed of text, an index, and a HExp }}  by
 
-    % Trying to use && here leads to multiple parses
-    hprops |- e && isChunk e
-    ------------------------ :: Compose
+    % Change `isChunk e` to is c `t is chunk`
+    % Prove this going up.
+    
+    -------------------------------- :: Compose
     hprops |- compose t x e
 
+  
+  
+  defn
+  null e ::   :: isNull :: '' {{ com HExp is null }} by
+
+  hprops |- compose t x e  && isUnit 
+  ----------- :: is_null
+  null e
+
+  defn
+  isUnit m :: :: isUnit :: '' {{ com an element of a monoid is the unit }} by
+
+    -------- :: is_unit
+    isUnit m
+    
 
 % Judgements on holes
 defns
@@ -79,6 +97,7 @@ holes :: '' ::=
     --------------------- :: hole_list
     isHoleList h
 
+  % Make the following forumulas
   defn
   i in ehls ::  :: emptyHole :: '' {{ com index of empty hole }} by
 
@@ -127,9 +146,19 @@ holes :: '' ::=
 
   % End of support judgments----------------------------------------------
 
+  % Move rules below under single judgement
+  defn
+  (ehls, fhls) |- [i] ::  :: filledHoles :: '' {{ com list of filled hole indices }} by
+ 
+    i nin ehls && i in fhls
+    ----------------------- :: filled_list
+    (ehls, fhls) |- [i]
+
   defn
   (ehls, fhls) |- h ::  :: singleEmptyHole :: '' {{ com singleton list containing empty hole }} by
 
+  % PROSPECTIVE CHANGE: i is a valid empty or filled hole
+  % ...|- use this to check that the rest of list is valid
     \-/ i in h: i in ehls && i nin fhls
     |h| > 0
     ----------------------------------- :: singleton_empty
@@ -138,3 +167,5 @@ holes :: '' ::=
     i nin ehls && i in fhls
     ----------------------- :: filled_list
     (ehls, fhls) |- [i]
+
+  % Edit judgments above to accomodate the changes from Harley.
